@@ -1,24 +1,27 @@
 ﻿namespace MongoCompareSync;
+using System.Globalization;
+
+using Resources.Localization;
 
 public partial class MainPage : ContentPage
 {
-	int count = 0;
 
-	public MainPage()
-	{
-		InitializeComponent();
-	}
+    public MainPage()
+    {
+        InitializeComponent();
+        LanguagePicker.Items.Add("zh-CN");
+        LanguagePicker.Items.Add("en-US");
+        LanguagePicker.SelectedIndex = 0;
+        LocalizationResourceManager = LocalizationResourceManager.Instance;
+        BindingContext = this;
+    }
 
-	private void OnCounterClicked(object sender, EventArgs e)
-	{
-		count++;
+    public LocalizationResourceManager LocalizationResourceManager { get; }
 
-		if (count == 1)
-			CounterBtn.Text = $"Clicked {count} time";
-		else
-			CounterBtn.Text = $"Clicked {count} times";
+    private void LanguageChanged(object sender, EventArgs e)
+    {
+        LocalizationResourceManager.Instance.SetCulture(new CultureInfo(LanguagePicker.Items[LanguagePicker.SelectedIndex]));
+    }
 
-		SemanticScreenReader.Announce(CounterBtn.Text);
-	}
 }
 
