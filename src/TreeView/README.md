@@ -1,6 +1,8 @@
-﻿## Getting Started
+﻿# 支持拖放的 .NET MAUI TreeView 组件<br/> A .NET MAUI TreeView components with supports drag-and-drop
 
-- Fork from [TreeView.Maui](https://github.com/enisn/TreeView.Maui).
+Fork from [TreeView.Maui](https://github.com/enisn/TreeView.Maui).
+
+## Getting Started
 
 - Create your nodes with `TreeViewNode` class.
 
@@ -11,7 +13,7 @@
 
       public MainPageViewModel()
       {
-          Nodes.Add(new TreeViewNode("A")
+          Nodes.Add(new TreeViewNode("A", icon: FabIconFont.HardDriveGroup, canDrag: false, allowDrop: false)
           {
               Children =
               {

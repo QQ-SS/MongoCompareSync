@@ -1,6 +1,8 @@
 ﻿using System.Collections;
 using System.Collections.Specialized;
 
+using Microsoft.Maui.Controls;
+
 using TreeView.Core;
 
 namespace TreeView.Controls;
@@ -8,6 +10,10 @@ namespace TreeView.Controls;
 public partial class TreeView : ContentView
 {
     private readonly StackLayout _root = new() { Spacing = 0 };
+
+    public event EventHandler<DragStartingEventArgs>? NodeDragStarting;
+    public event EventHandler<DragEventArgs>? NodeDragOver;
+    public event EventHandler<DropEventArgs>? NodeDrop;
 
     public TreeView()
     {
@@ -43,8 +49,11 @@ public partial class TreeView : ContentView
                         object? item = e.NewItems[i];
                         if (item != null)
                         {
-                            _root.Children.Insert(e.NewStartingIndex,
-                                new TreeViewNodeView((IHasChildrenTreeViewNode)item, ItemTemplate, ArrowTheme, IconFontFamily, IconExtend, ShowNodeIcon));
+                            var vNode = new TreeViewNodeView((IHasChildrenTreeViewNode)item, ItemTemplate, ArrowTheme, IconFontFamily, IconExtend, ShowNodeIcon);
+                            vNode.DragStarting += NodeDragStarting;
+                            vNode.DragOver += NodeDragOver;
+                            vNode.Drop += NodeDrop;
+                            _root.Children.Insert(e.NewStartingIndex, vNode);
                         }
                     }
                 }
@@ -84,7 +93,11 @@ public partial class TreeView : ContentView
         {
             if (item is IHasChildrenTreeViewNode node)
             {
-                _root.Children.Add(new TreeViewNodeView(node, ItemTemplate, ArrowTheme, IconFontFamily, IconExtend, ShowNodeIcon));
+                var vNode = new TreeViewNodeView(node, ItemTemplate, ArrowTheme, IconFontFamily, IconExtend, ShowNodeIcon);
+                vNode.DragStarting += NodeDragStarting;
+                vNode.DragOver += NodeDragOver;
+                vNode.Drop += NodeDrop;
+                _root.Children.Add(vNode);
             }
         }
     }
@@ -108,6 +121,44 @@ public class TreeViewNodeView : ContentView
     protected string? IconFontFamily { get; }
     protected string? IconExtend { get; }
     protected bool ShowNodeIcon { get; }
+
+    public event EventHandler<DragStartingEventArgs>? DragStarting;
+    public event EventHandler<DragEventArgs>? DragOver;
+    public event EventHandler<DropEventArgs>? Drop;
+
+    private void OnDragStarting(object? sender, DragStartingEventArgs e)
+    {
+        //IHasChildrenTreeViewNode? nodeFrom = (sender as DragGestureRecognizer)?.DragStartingCommandParameter as IHasChildrenTreeViewNode;
+        //e.Data.Properties.Add("Node", nodeFrom);
+        DragStarting?.Invoke(sender, e);
+    }
+
+    private void OnDragOver(object? sender, DragEventArgs e)
+    {
+        //IHasChildrenTreeViewNode? nodeTo = (sender as DropGestureRecognizer)?.DropCommandParameter as IHasChildrenTreeViewNode;
+        //if (e.Data.Properties.TryGetValue("Node", out var obj))
+        //{
+        //    IHasChildrenTreeViewNode? nodeFrom = obj as IHasChildrenTreeViewNode;
+        //    if (nodeFrom?.Name == "A" && nodeTo?.Name == "A")
+        //    {
+        //        e.AcceptedOperation = DataPackageOperation.None;
+        //    }
+        //    Console.WriteLine(nodeFrom);
+        //}
+        DragOver?.Invoke(sender, e);
+    }
+
+    private void OnDrop(object? sender, DropEventArgs e)
+    {
+        //IHasChildrenTreeViewNode? nodeTo = (sender as DropGestureRecognizer)?.DropCommandParameter as IHasChildrenTreeViewNode;
+        //if (e.Data.Properties.TryGetValue("Node", out var obj))
+        //{
+        //    IHasChildrenTreeViewNode? nodeFrom = obj as IHasChildrenTreeViewNode;
+        //    Console.WriteLine(nodeFrom);
+        //    Console.WriteLine(nodeTo);
+        //}
+        Drop?.Invoke(sender, e);
+    }
 
     public TreeViewNodeView(IHasChildrenTreeViewNode node, DataTemplate itemTemplate, NodeArrowTheme theme, string? iconFontFamily, string? iconExtend, bool showNodeIcon)
     {
@@ -190,6 +241,22 @@ public class TreeViewNodeView : ContentView
 
         var content = ItemTemplate.CreateContent() as View;
 
+        var drag = new DragGestureRecognizer
+        {
+            CanDrag = node.CanDrag,
+            // DragStartingCommand = new Command<object>(OnDragStarting),
+            DragStartingCommandParameter = node,
+        };
+        drag.DragStarting += OnDragStarting;
+
+        var drop = new DropGestureRecognizer
+        {
+            AllowDrop = node.AllowDrop,
+            // DropCommand = new Command<object>(OnDrop),
+            DropCommandParameter = node,
+        };
+        drop.DragOver += OnDragOver;
+        drop.Drop += OnDrop;
 
         sl.Children.Add(new StackLayout
         {
@@ -198,24 +265,32 @@ public class TreeViewNodeView : ContentView
             Children =
             {
                 _extendButton,
-                ShowNodeIcon && !string.IsNullOrEmpty(node.Icon)
-                    ? new StackLayout
-                        {
-                            Spacing = 8,
-                            Orientation = StackOrientation.Horizontal,
-                            Children =
-                            {
-                                new Label { FontFamily = IconFontFamily, Text = node.Icon, VerticalOptions = LayoutOptions.Center },
-                                content
-                            }
-                        }
-                    :content
+                new StackLayout
+                {
+                    Spacing = 8,
+                    Orientation = StackOrientation.Horizontal,
+                    Children =
+                    {
+                        ShowNodeIcon && !string.IsNullOrEmpty(node.Icon)
+                            ? new Label { FontFamily = IconFontFamily, Text = node.Icon, VerticalOptions = LayoutOptions.Center }
+                            : null,
+                        content,
+                    },
+                    GestureRecognizers =
+                    {
+                        drag,
+                        drop,
+                    }
+                }
             }
         });
-
         foreach (var child in node.Children)
         {
-            _slChildrens.Children.Add(new TreeViewNodeView(child, ItemTemplate, theme, IconFontFamily, IconExtend, ShowNodeIcon));
+            var vNode = new TreeViewNodeView(child, ItemTemplate, theme, IconFontFamily, IconExtend, ShowNodeIcon);
+            vNode.DragStarting += OnDragStarting;
+            vNode.DragOver += OnDragOver;
+            vNode.Drop += OnDrop;
+            _slChildrens.Children.Add(vNode);
         }
 
         sl.Children.Add(_slChildrens);
@@ -235,8 +310,11 @@ public class TreeViewNodeView : ContentView
                 object? item = e.NewItems[i];
                 if (item != null)
                 {
-                    _slChildrens.Children.Insert(e.NewStartingIndex,
-                        new TreeViewNodeView((IHasChildrenTreeViewNode)item, ItemTemplate, ArrowTheme, IconFontFamily, IconExtend, ShowNodeIcon));
+                    var vNode = new TreeViewNodeView((IHasChildrenTreeViewNode)item, ItemTemplate, ArrowTheme, IconFontFamily, IconExtend, ShowNodeIcon);
+                    vNode.DragStarting += OnDragStarting;
+                    vNode.DragOver += OnDragOver;
+                    vNode.Drop += OnDrop;
+                    _slChildrens.Children.Insert(e.NewStartingIndex, vNode);
                 }
             }
         }

@@ -6,4 +6,6 @@ public interface ITreeViewNode
     string? Icon { get; set; }
     object? Value { get; set; }
     bool IsExtended { get; set; }
+    bool CanDrag { get; set; }
+    bool AllowDrop { get; set; }
 }

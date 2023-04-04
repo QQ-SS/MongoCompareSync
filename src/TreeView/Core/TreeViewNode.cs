@@ -7,21 +7,25 @@ public class TreeViewNode : BindableObject, ILazyLoadTreeViewNode
 {
     private bool? _isLeaf;
     private string _name = string.Empty;
+    private object? _value;
     private string? _icon;
     private bool _isExtended;
-    private object? _value;
+    private bool _canDrag;
+    private bool _allowDrop;
 
     public TreeViewNode()
     {
     }
 
     public TreeViewNode(string name, object? value = null, string? icon = null, bool isExtended = false,
-        IList<IHasChildrenTreeViewNode>? children = null)
+        bool canDrag = true, bool allowDrop = true, IList<IHasChildrenTreeViewNode>? children = null)
     {
         Name = name;
         Value = value;
         Icon = icon;
         IsExtended = isExtended;
+        CanDrag = canDrag;
+        AllowDrop = allowDrop;
 
         if (children != null)
         {
@@ -30,9 +34,11 @@ public class TreeViewNode : BindableObject, ILazyLoadTreeViewNode
     }
 
     public virtual string Name { get => _name; set => SetProperty(ref _name, value); }
+    public virtual object? Value { get => _value; set => SetProperty(ref this._value, value); }
     public virtual string? Icon { get => _icon; set => SetProperty(ref _icon, value); }
     public virtual bool IsExtended { get => _isExtended; set => SetProperty(ref _isExtended, value); }
-    public virtual object? Value { get => _value; set => SetProperty(ref this._value, value); }
+    public virtual bool CanDrag { get => _canDrag; set => SetProperty(ref _canDrag, value); }
+    public virtual bool AllowDrop { get => _allowDrop; set => SetProperty(ref _allowDrop, value); }
 
     public virtual IList<IHasChildrenTreeViewNode> Children { get; set; } =
         new ObservableCollection<IHasChildrenTreeViewNode>();
