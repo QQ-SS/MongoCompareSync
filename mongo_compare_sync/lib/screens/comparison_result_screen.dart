@@ -32,8 +32,11 @@ class _ComparisonResultScreenState extends State<ComparisonResultScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 获取所有字段差异
+    final List<FieldDiff> allFieldDiffs = _getAllFieldDiffs();
+
     // 过滤并排序结果
-    final filteredResults = _filterResults();
+    final filteredDiffs = _filterDiffs(allFieldDiffs);
 
     return Scaffold(
       appBar: AppBar(
@@ -69,23 +72,34 @@ class _ComparisonResultScreenState extends State<ComparisonResultScreen> {
           _buildFilterBar(),
 
           // 结果统计信息
-          _buildResultsSummary(),
+          _buildResultsSummary(allFieldDiffs),
 
           // 结果列表
           Expanded(
-            child: filteredResults.isEmpty
+            child: filteredDiffs.isEmpty
                 ? const Center(child: Text('没有符合条件的差异项'))
                 : ListView.builder(
-                    itemCount: filteredResults.length,
+                    itemCount: filteredDiffs.length,
                     itemBuilder: (context, index) {
-                      final diff = filteredResults[index];
-                      return _buildDiffItemFromDocumentDiff(diff);
+                      final diff = filteredDiffs[index];
+                      return _buildDiffItemFromFieldDiff(diff);
                     },
                   ),
           ),
         ],
       ),
     );
+  }
+
+  /// 获取所有字段差异
+  List<FieldDiff> _getAllFieldDiffs() {
+    final List<FieldDiff> allDiffs = [];
+
+    for (final docDiff in widget.results) {
+      allDiffs.addAll(docDiff.fieldDiffList);
+    }
+
+    return allDiffs;
   }
 
   /// 构建过滤栏
@@ -184,15 +198,13 @@ class _ComparisonResultScreenState extends State<ComparisonResultScreen> {
   }
 
   /// 构建结果统计信息
-  Widget _buildResultsSummary() {
-    final totalDiffs = widget.results.length;
-    final addedCount = widget.results
-        .where((diff) => diff.status == 'added')
-        .length;
-    final removedCount = widget.results
+  Widget _buildResultsSummary(List<FieldDiff> allDiffs) {
+    final totalDiffs = allDiffs.length;
+    final addedCount = allDiffs.where((diff) => diff.status == 'added').length;
+    final removedCount = allDiffs
         .where((diff) => diff.status == 'removed')
         .length;
-    final modifiedCount = widget.results
+    final modifiedCount = allDiffs
         .where((diff) => diff.status == 'modified')
         .length;
 
@@ -228,8 +240,8 @@ class _ComparisonResultScreenState extends State<ComparisonResultScreen> {
     );
   }
 
-  /// 从DocumentDiff构建DiffItem组件
-  Widget _buildDiffItemFromDocumentDiff(DocumentDiff diff) {
+  /// 从FieldDiff构建DiffItem组件
+  Widget _buildDiffItemFromFieldDiff(FieldDiff diff) {
     // 获取差异类型
     DiffType diffType;
     switch (diff.status) {
@@ -246,7 +258,7 @@ class _ComparisonResultScreenState extends State<ComparisonResultScreen> {
     }
 
     // 获取字段路径
-    final fieldPath = diff.fieldPath ?? diff.id;
+    final fieldPath = diff.fieldPath;
 
     // 获取展开状态
     final isExpanded = _expandedItems[fieldPath] ?? false;
@@ -265,10 +277,10 @@ class _ComparisonResultScreenState extends State<ComparisonResultScreen> {
     );
   }
 
-  /// 过滤结果
-  List<DocumentDiff> _filterResults() {
+  /// 过滤差异
+  List<FieldDiff> _filterDiffs(List<FieldDiff> diffs) {
     // 应用过滤条件
-    var filtered = widget.results.where((diff) {
+    var filtered = diffs.where((diff) {
       // 按差异类型过滤
       if (diff.status == 'added' && !_showAdded) return false;
       if (diff.status == 'removed' && !_showRemoved) return false;
@@ -276,8 +288,9 @@ class _ComparisonResultScreenState extends State<ComparisonResultScreen> {
 
       // 按搜索关键字过滤
       if (_searchQuery.isNotEmpty) {
-        final fieldPath = diff.fieldPath ?? diff.id;
-        return fieldPath.toLowerCase().contains(_searchQuery.toLowerCase());
+        return diff.fieldPath.toLowerCase().contains(
+          _searchQuery.toLowerCase(),
+        );
       }
 
       return true;
@@ -285,11 +298,7 @@ class _ComparisonResultScreenState extends State<ComparisonResultScreen> {
 
     // 应用排序
     if (_sortBy == 'path') {
-      filtered.sort((a, b) {
-        final pathA = a.fieldPath ?? a.id;
-        final pathB = b.fieldPath ?? b.id;
-        return pathA.compareTo(pathB);
-      });
+      filtered.sort((a, b) => a.fieldPath.compareTo(b.fieldPath));
     } else if (_sortBy == 'type') {
       filtered.sort((a, b) {
         // 先按类型排序，再按路径排序
@@ -299,9 +308,7 @@ class _ComparisonResultScreenState extends State<ComparisonResultScreen> {
         if (typeA != typeB) {
           return typeA.compareTo(typeB);
         } else {
-          final pathA = a.fieldPath ?? a.id;
-          final pathB = b.fieldPath ?? b.id;
-          return pathA.compareTo(pathB);
+          return a.fieldPath.compareTo(b.fieldPath);
         }
       });
     }
