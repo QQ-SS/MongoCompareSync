@@ -6,6 +6,7 @@ import '../widgets/diff_item.dart';
 import '../widgets/responsive_layout.dart';
 import '../widgets/loading_indicator.dart';
 import '../services/platform_service.dart';
+import '../services/export_service.dart';
 import '../providers/connection_provider.dart';
 
 class ComparisonResultScreen extends ConsumerStatefulWidget {
@@ -69,12 +70,7 @@ class _ComparisonResultScreenState
           IconButton(
             icon: const Icon(Icons.save),
             tooltip: '导出结果',
-            onPressed: () {
-              // TODO: 实现导出功能
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('导出功能尚未实现')));
-            },
+            onPressed: _showExportDialog,
           ),
           _isSyncing
               ? IconButton(
@@ -728,6 +724,196 @@ class _ComparisonResultScreenState
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('同步失败: ${e.toString()}')));
+    }
+  }
+
+  // 显示导出对话框
+  void _showExportDialog() {
+    final isSmallScreen = ResponsiveLayoutUtil.isSmallScreen(context);
+    final platformService = PlatformService.instance;
+    final dialogWidth = isSmallScreen ? null : 500.0;
+
+    // 默认导出格式
+    ExportFormat selectedFormat = ExportFormat.html;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('导出比较结果'),
+        content: StatefulBuilder(
+          builder: (context, setState) {
+            return Container(
+              width: dialogWidth,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('请选择导出格式:'),
+                  const SizedBox(height: 8),
+
+                  // 导出格式选择
+                  Card(
+                    elevation: platformService.getPlatformElevation() / 2,
+                    child: Column(
+                      children: [
+                        RadioListTile<ExportFormat>(
+                          title: Row(
+                            children: [
+                              Icon(Icons.html, size: 20),
+                              const SizedBox(width: 8),
+                              const Text('HTML'),
+                            ],
+                          ),
+                          subtitle: const Text('生成包含样式的HTML报告'),
+                          value: ExportFormat.html,
+                          groupValue: selectedFormat,
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() {
+                                selectedFormat = value;
+                              });
+                            }
+                          },
+                        ),
+                        RadioListTile<ExportFormat>(
+                          title: Row(
+                            children: [
+                              Icon(Icons.text_snippet, size: 20),
+                              const SizedBox(width: 8),
+                              const Text('Markdown'),
+                            ],
+                          ),
+                          subtitle: const Text('生成Markdown格式的文本报告'),
+                          value: ExportFormat.markdown,
+                          groupValue: selectedFormat,
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() {
+                                selectedFormat = value;
+                              });
+                            }
+                          },
+                        ),
+                        RadioListTile<ExportFormat>(
+                          title: Row(
+                            children: [
+                              Icon(Icons.table_chart, size: 20),
+                              const SizedBox(width: 8),
+                              const Text('CSV'),
+                            ],
+                          ),
+                          subtitle: const Text('生成可在电子表格中打开的CSV文件'),
+                          value: ExportFormat.csv,
+                          groupValue: selectedFormat,
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() {
+                                selectedFormat = value;
+                              });
+                            }
+                          },
+                        ),
+                        RadioListTile<ExportFormat>(
+                          title: Row(
+                            children: [
+                              Icon(Icons.data_object, size: 20),
+                              const SizedBox(width: 8),
+                              const Text('JSON'),
+                            ],
+                          ),
+                          subtitle: const Text('生成结构化的JSON数据'),
+                          value: ExportFormat.json,
+                          groupValue: selectedFormat,
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() {
+                                selectedFormat = value;
+                              });
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _exportResults(selectedFormat);
+            },
+            child: const Text('导出'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 导出比较结果
+  Future<void> _exportResults(ExportFormat format) async {
+    try {
+      // 显示加载指示器
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('正在生成报告...'),
+            ],
+          ),
+        ),
+      );
+
+      // 获取所有文档差异
+      final List<DocumentDiff> results = widget.results;
+
+      // 使用导出服务导出结果
+      final exportService = ExportService.instance;
+      final filePath = await exportService.exportComparisonResults(
+        results: results,
+        sourceCollection: widget.sourceCollection,
+        targetCollection: widget.targetCollection,
+        format: format,
+      );
+
+      // 关闭加载对话框
+      Navigator.of(context).pop();
+
+      if (filePath != null) {
+        // 显示成功消息
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('报告已成功导出到: $filePath'),
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(label: '确定', onPressed: () {}),
+          ),
+        );
+      }
+    } catch (e) {
+      // 关闭加载对话框
+      Navigator.of(context).pop();
+
+      // 显示错误消息
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('导出失败: ${e.toString()}'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
     }
   }
 
