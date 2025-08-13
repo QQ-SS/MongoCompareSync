@@ -19,13 +19,11 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
   @override
   void initState() {
     super.initState();
-    // 初始化Hive和ConnectionRepository
-    _initRepository();
+    // 刷新连接列表
+    _refreshConnections();
   }
 
-  Future<void> _initRepository() async {
-    final repository = ref.read(connectionRepositoryProvider);
-    await repository.init();
+  void _refreshConnections() {
     // 刷新连接列表
     ref.read(connectionsProvider.notifier).refreshConnections();
   }
