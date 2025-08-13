@@ -8,12 +8,14 @@ class ConnectionList extends ConsumerWidget {
   final Function(MongoConnection) onConnectionSelected;
   final Function(MongoConnection) onEditConnection;
   final Function(String) onDeleteConnection;
+  final VoidCallback onAddConnection; // New parameter
 
   const ConnectionList({
     super.key,
     required this.onConnectionSelected,
     required this.onEditConnection,
     required this.onDeleteConnection,
+    required this.onAddConnection, // New parameter
   });
 
   @override
@@ -23,20 +25,23 @@ class ConnectionList extends ConsumerWidget {
 
     return connectionsState.when(
       data: (connections) {
-        if (connections.isEmpty) {
-          return const Center(
-            child: Text(
-              '没有保存的连接\n点击下方的"+"按钮添加新连接',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-          );
-        }
-
         return ListView.builder(
-          itemCount: connections.length,
+          itemCount: connections.length + 1, // +1 for the add button
           itemBuilder: (context, index) {
-            final connection = connections[index];
+            if (index == 0) {
+              // Add Connection button
+              return Card(
+                elevation: 1,
+                margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                child: ListTile(
+                  leading: const Icon(Icons.add_circle_outline),
+                  title: const Text('添加新连接'),
+                  onTap: onAddConnection,
+                ),
+              );
+            }
+
+            final connection = connections[index - 1]; // Adjust index
             final isSelected = selectedConnection?.id == connection.id;
 
             return Card(
@@ -46,13 +51,15 @@ class ConnectionList extends ConsumerWidget {
                   ? Theme.of(context).colorScheme.primaryContainer
                   : null,
               child: ListTile(
-                leading: Icon(
+                leading: const Icon(
                   Icons.storage,
-                  color: connection.isConnected
-                      ? Theme.of(context).colorScheme.primary
-                      : null,
+                ), // Removed Stack and isConnected indicator
+                title: Row(
+                  children: [
+                    Text(connection.name),
+                    // Removed isConnected badge
+                  ],
                 ),
-                title: Text(connection.name),
                 subtitle: Text(
                   '${connection.host}:${connection.port}${connection.authDb != null && connection.authDb!.isNotEmpty ? '/${connection.authDb}' : ''}',
                 ),

@@ -82,90 +82,79 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
   }
 
   Widget _buildConnectionDetails() {
-    final connection = _selectedConnection!;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(connection.name, style: Theme.of(context).textTheme.headlineSmall),
-        const SizedBox(height: 16),
-        Card(
-          elevation: 2,
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    // 使用 Consumer 监听连接状态变化
+    return Consumer(
+      builder: (context, ref, child) {
+        // 获取最新的连接信息
+        final connectionsState = ref.watch(connectionsProvider);
+
+        // 从连接列表中找到当前连接的最新状态
+        MongoConnection connection = _selectedConnection!;
+        connectionsState.whenData((connections) {
+          final matchingConnection = connections.firstWhere(
+            (conn) => conn.id == _selectedConnection!.id,
+            orElse: () => _selectedConnection!,
+          );
+          connection = matchingConnection;
+        });
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              connection.name,
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 16),
+            Card(
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildDetailRow(
+                      '主机',
+                      '${connection.host}:${connection.port}',
+                    ),
+                    if (connection.username != null &&
+                        connection.username!.isNotEmpty)
+                      _buildDetailRow('用户名', connection.username!),
+                    if (connection.authDb != null &&
+                        connection.authDb!.isNotEmpty)
+                      _buildDetailRow('认证数据库', connection.authDb!),
+                    _buildDetailRow(
+                      'SSL',
+                      connection.useSsl == true ? '启用' : '禁用',
+                    ),
+                    // Removed isConnected status display
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _buildDetailRow('主机', '${connection.host}:${connection.port}'),
-                if (connection.username != null &&
-                    connection.username!.isNotEmpty)
-                  _buildDetailRow('用户名', connection.username!),
-                if (connection.authDb != null && connection.authDb!.isNotEmpty)
-                  _buildDetailRow('认证数据库', connection.authDb!),
-                _buildDetailRow('SSL', connection.useSsl == true ? '启用' : '禁用'),
-                _buildDetailRow('状态', connection.isConnected ? '已连接' : '未连接'),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _isEditing = true;
+                    });
+                  },
+                  icon: const Icon(Icons.edit),
+                  label: const Text('编辑'),
+                ),
+                // Removed ConnectionButton
               ],
             ),
-          ),
-        ),
-        const SizedBox(height: 24),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            ElevatedButton.icon(
-              onPressed: () {
-                setState(() {
-                  _isEditing = true;
-                });
-              },
-              icon: const Icon(Icons.edit),
-              label: const Text('编辑'),
-            ),
-            ElevatedButton.icon(
-              onPressed: connection.isConnected
-                  ? () async {
-                      try {
-                        await ref
-                            .read(connectionRepositoryProvider)
-                            .disconnect(connection.id);
-                        // 刷新连接列表
-                        ref
-                            .read(connectionsProvider.notifier)
-                            .refreshConnections();
-                      } catch (e) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('断开连接失败: ${e.toString()}')),
-                          );
-                        }
-                      }
-                    }
-                  : () async {
-                      try {
-                        await ref
-                            .read(connectionRepositoryProvider)
-                            .connect(connection.id);
-                        // 刷新连接列表
-                        ref
-                            .read(connectionsProvider.notifier)
-                            .refreshConnections();
-                      } catch (e) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('连接失败: ${e.toString()}')),
-                          );
-                        }
-                      }
-                    },
-              icon: Icon(connection.isConnected ? Icons.link_off : Icons.link),
-              label: Text(connection.isConnected ? '断开' : '连接'),
-            ),
           ],
-        ),
-      ],
+        );
+      },
     );
   }
 
-  Widget _buildDetailRow(String label, String value) {
+  Widget _buildDetailRow(String label, String value, {Color? valueColor}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
@@ -178,7 +167,12 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
-          Expanded(child: Text(value)),
+          Expanded(
+            child: Text(
+              value,
+              style: valueColor != null ? TextStyle(color: valueColor) : null,
+            ),
+          ),
         ],
       ),
     );
@@ -195,6 +189,8 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
             onConnectionSelected: _handleConnectionSelected,
             onEditConnection: _handleEditConnection,
             onDeleteConnection: _handleDeleteConnection,
+            onAddConnection:
+                _handleAddConnection, // Pass the add connection callback
           ),
           loading: () => Column(
             children: [
@@ -270,11 +266,6 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
             ),
           ],
         ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: _handleAddConnection,
-          tooltip: '添加新连接',
-          child: const Icon(Icons.add),
-        ),
       ),
 
       // 中等屏幕和大屏幕布局 - 水平排列
@@ -309,11 +300,6 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
               ),
             ),
           ],
-        ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: _handleAddConnection,
-          tooltip: '添加新连接',
-          child: const Icon(Icons.add),
         ),
       ),
 
