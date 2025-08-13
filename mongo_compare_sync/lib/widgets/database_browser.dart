@@ -8,11 +8,15 @@ import '../repositories/connection_repository.dart';
 class DatabaseBrowser extends ConsumerStatefulWidget {
   final MongoConnection connection;
   final Function(String, String)? onCollectionSelected;
+  final String? selectedDatabase;
+  final String? selectedCollection;
 
   const DatabaseBrowser({
     super.key,
     required this.connection,
     this.onCollectionSelected,
+    this.selectedDatabase,
+    this.selectedCollection,
   });
 
   @override
@@ -31,6 +35,19 @@ class _DatabaseBrowserState extends ConsumerState<DatabaseBrowser> {
   void initState() {
     super.initState();
     _loadDatabases();
+
+    // 如果有预选的数据库和集合，设置选中状态
+    if (widget.selectedDatabase != null) {
+      _selectedDatabase = widget.selectedDatabase;
+
+      // 加载该数据库的集合
+      _loadCollections(widget.selectedDatabase!);
+
+      // 如果有预选的集合，设置选中状态
+      if (widget.selectedCollection != null) {
+        _selectedCollection = widget.selectedCollection;
+      }
+    }
   }
 
   @override

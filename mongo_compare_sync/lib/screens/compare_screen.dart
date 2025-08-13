@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/connection.dart';
 import '../models/collection.dart';
@@ -9,7 +10,9 @@ import '../providers/rule_provider.dart';
 import '../widgets/database_browser.dart';
 import '../widgets/responsive_layout.dart';
 import '../widgets/loading_indicator.dart';
+import '../widgets/skeleton_loader.dart';
 import '../services/platform_service.dart';
+import '../services/log_service.dart';
 import 'comparison_result_screen.dart';
 import 'rule_list_screen.dart';
 
@@ -37,6 +40,16 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
     super.initState();
     // 获取已保存的连接
     _loadConnections();
+
+    // 注册快捷键
+    _registerShortcuts();
+  }
+
+  @override
+  void dispose() {
+    // 清理快捷键
+    _unregisterShortcuts();
+    super.dispose();
   }
 
   void _loadConnections() {
@@ -84,6 +97,155 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
       _targetDatabase = database;
       _targetCollection = collection;
     });
+  }
+
+  // 注册平台特定的快捷键
+  void _registerShortcuts() {
+    final platformService = PlatformService.instance;
+
+    // 比较快捷键 (Ctrl+Enter 或 Cmd+Enter)
+    final compareShortcut = LogicalKeySet(
+      platformService.isMacOS
+          ? LogicalKeyboardKey.meta
+          : LogicalKeyboardKey.control,
+      LogicalKeyboardKey.enter,
+    );
+
+    // 添加快捷键处理
+    ServicesBinding.instance.keyboard.addHandler((event) {
+      if (compareShortcut.accepts(event, HardwareKeyboard.instance)) {
+        if (_sourceCollection != null &&
+            _targetCollection != null &&
+            !_isComparing) {
+          _compareCollections();
+          return true;
+        }
+      }
+      return false;
+    });
+  }
+
+  // 清理快捷键
+  void _unregisterShortcuts() {
+    // 移除快捷键处理
+    ServicesBinding.instance.keyboard.removeHandler((event) => false);
+  }
+
+  // 构建快捷键提示
+  Widget _buildShortcutHint(PlatformService platformService) {
+    return Card(
+      elevation: 0,
+      color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Row(
+          children: [
+            Icon(
+              Icons.keyboard,
+              size: 16,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '快捷键: ${platformService.isMacOS ? "⌘ + Enter 执行比较" : "Ctrl + Enter 执行比较"}',
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 构建比较结果预览
+  Widget _buildComparisonResultPreview(
+    PlatformService platformService,
+    double spacing,
+  ) {
+    if (_comparisonResults == null || _comparisonResults!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final totalDiffs = _comparisonResults!.length;
+    final addedCount = _comparisonResults!
+        .where((diff) => diff.status == 'added')
+        .length;
+    final removedCount = _comparisonResults!
+        .where((diff) => diff.status == 'removed')
+        .length;
+    final modifiedCount = _comparisonResults!
+        .where((diff) => diff.status == 'modified')
+        .length;
+
+    return Card(
+      elevation: platformService.getPlatformElevation(),
+      margin: EdgeInsets.symmetric(vertical: spacing),
+      child: Padding(
+        padding: EdgeInsets.all(spacing),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.compare_arrows,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Text('比较结果摘要', style: Theme.of(context).textTheme.titleMedium),
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => ComparisonResultScreen(
+                          results: _comparisonResults!,
+                          sourceCollection:
+                              '$_sourceDatabase.$_sourceCollection',
+                          targetCollection:
+                              '$_targetDatabase.$_targetCollection',
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.visibility),
+                  label: const Text('查看详情'),
+                ),
+              ],
+            ),
+            const Divider(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildStatItem('总差异', totalDiffs, Colors.blue),
+                _buildStatItem('新增', addedCount, Colors.green),
+                _buildStatItem('删除', removedCount, Colors.red),
+                _buildStatItem('修改', modifiedCount, Colors.amber),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 构建统计项
+  Widget _buildStatItem(String label, int count, Color color) {
+    return Column(
+      children: [
+        Text(
+          count.toString(),
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        Text(label),
+      ],
+    );
   }
 
   Future<void> _compareCollections() async {
@@ -140,6 +302,7 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
         ).showSnackBar(const SnackBar(content: Text('没有发现差异')));
       }
     } catch (e) {
+      LogService.instance.error('比较集合失败', e);
       setState(() {
         _error = '比较失败: ${e.toString()}';
         _isComparing = false;
@@ -161,34 +324,36 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
             .toList();
 
         if (connectedConnections.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.warning_amber_rounded,
-                  size: 64,
-                  color: Colors.amber,
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  '没有活跃的数据库连接',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  '请先在连接管理页面连接至少一个数据库',
-                  style: TextStyle(fontSize: 16, color: Colors.grey),
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                  icon: const Icon(Icons.link),
-                  label: const Text('前往连接管理'),
-                ),
-              ],
+          return Scaffold(
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.warning_amber_rounded,
+                    size: 64,
+                    color: Colors.amber,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    '没有活跃的数据库连接',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    '请先在连接管理页面连接至少一个数据库',
+                    style: TextStyle(fontSize: 16, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                    icon: const Icon(Icons.link),
+                    label: const Text('前往连接管理'),
+                  ),
+                ],
+              ),
             ),
           );
         }
@@ -213,32 +378,64 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
           large: null,
         );
       },
-      loading: () => const Center(
-        child: LoadingIndicator(message: '加载连接信息...', size: 40.0),
-      ),
-      error: (error, stackTrace) => Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, color: Colors.red, size: 48),
-            const SizedBox(height: 16),
-            Text('加载连接失败', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            Text(
-              error.toString(),
-              style: Theme.of(context).textTheme.bodyMedium,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () {
-                ref.read(connectionsProvider.notifier).refreshConnections();
-              },
-              child: const Text('重试'),
-            ),
-          ],
+      loading: () => Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const LoadingIndicator(message: '加载连接信息...', size: 40.0),
+              const SizedBox(height: 16),
+              Text(
+                '正在加载数据库连接...',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            ],
+          ),
         ),
       ),
+      error: (err, stackTrace) {
+        // 记录错误
+        LogService.instance.error('Failed to load connections', err);
+
+        return Scaffold(
+          body: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                const SizedBox(height: 16),
+                Text('加载连接失败', style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.errorContainer.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  constraints: const BoxConstraints(maxWidth: 500),
+                  child: Text(
+                    err.toString(),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    ref.read(connectionsProvider.notifier).refreshConnections();
+                  },
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('重试'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -255,6 +452,10 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // 快捷键提示
+              _buildShortcutHint(platformService),
+              SizedBox(height: spacing),
+
               // 连接选择区域
               _buildConnectionSelector(
                 '源数据库',
@@ -272,9 +473,31 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                   children: [
                     Padding(
                       padding: EdgeInsets.all(spacing),
-                      child: Text(
-                        '源数据库: ${_sourceConnection?.name ?? "未选择"}',
-                        style: Theme.of(context).textTheme.titleMedium,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '源数据库: ${_sourceConnection?.name ?? "未选择"}',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                          ),
+                          if (_sourceDatabase != null &&
+                              _sourceCollection != null)
+                            Chip(
+                              label: Text(
+                                '$_sourceDatabase.$_sourceCollection',
+                              ),
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.primaryContainer,
+                              labelStyle: TextStyle(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onPrimaryContainer,
+                                fontSize: 12,
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                     const Divider(height: 1),
@@ -286,6 +509,8 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                               connection: _sourceConnection!,
                               onCollectionSelected:
                                   _handleSourceCollectionSelected,
+                              selectedDatabase: _sourceDatabase,
+                              selectedCollection: _sourceCollection,
                             ),
                     ),
                   ],
@@ -310,9 +535,31 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                   children: [
                     Padding(
                       padding: EdgeInsets.all(spacing),
-                      child: Text(
-                        '目标数据库: ${_targetConnection?.name ?? "未选择"}',
-                        style: Theme.of(context).textTheme.titleMedium,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '目标数据库: ${_targetConnection?.name ?? "未选择"}',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                          ),
+                          if (_targetDatabase != null &&
+                              _targetCollection != null)
+                            Chip(
+                              label: Text(
+                                '$_targetDatabase.$_targetCollection',
+                              ),
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.secondaryContainer,
+                              labelStyle: TextStyle(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSecondaryContainer,
+                                fontSize: 12,
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                     const Divider(height: 1),
@@ -324,6 +571,8 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                               connection: _targetConnection!,
                               onCollectionSelected:
                                   _handleTargetCollectionSelected,
+                              selectedDatabase: _targetDatabase,
+                              selectedCollection: _targetCollection,
                             ),
                     ),
                   ],
@@ -332,64 +581,149 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
               SizedBox(height: spacing),
 
               // 比较规则选择区域
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('比较规则:', style: Theme.of(context).textTheme.titleSmall),
-                  SizedBox(height: spacing / 2),
-                  _buildRuleSelector(),
-                  SizedBox(height: spacing / 2),
-                  Center(
-                    child: TextButton.icon(
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => const RuleListScreen(),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.rule),
-                      label: const Text('管理规则'),
-                    ),
+              Card(
+                elevation: platformService.getPlatformElevation(),
+                child: Padding(
+                  padding: EdgeInsets.all(spacing),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '比较规则:',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      SizedBox(height: spacing / 2),
+                      _buildRuleSelector(),
+                      SizedBox(height: spacing / 2),
+                      Center(
+                        child: TextButton.icon(
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => const RuleListScreen(),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.rule),
+                          label: const Text('管理规则'),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
               SizedBox(height: spacing),
 
               // 比较操作区域
-              Center(
-                child: ElevatedButton.icon(
-                  onPressed: _isComparing
-                      ? null
-                      : (_sourceCollection != null && _targetCollection != null)
-                      ? _compareCollections
-                      : null,
-                  icon: _isComparing
-                      ? SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Theme.of(context).colorScheme.onPrimary,
+              Card(
+                elevation: platformService.getPlatformElevation(),
+                child: Padding(
+                  padding: EdgeInsets.all(spacing),
+                  child: Column(
+                    children: [
+                      // 比较按钮
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _isComparing
+                              ? null
+                              : (_sourceCollection != null &&
+                                    _targetCollection != null)
+                              ? _compareCollections
+                              : null,
+                          icon: _isComparing
+                              ? SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onPrimary,
+                                  ),
+                                )
+                              : const Icon(Icons.compare_arrows),
+                          label: Text(_isComparing ? '正在比较...' : '比较集合'),
+                        ),
+                      ),
+
+                      // 选择状态提示
+                      if (_sourceCollection == null ||
+                          _targetCollection == null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            '请先选择源和目标集合',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.outline,
+                              fontSize: 12,
+                            ),
                           ),
-                        )
-                      : const Icon(Icons.compare_arrows),
-                  label: const Text('比较集合'),
+                        ),
+
+                      // 快捷键提示
+                      if (_sourceCollection != null &&
+                          _targetCollection != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            platformService.isMacOS
+                                ? '快捷键: ⌘ + Enter'
+                                : '快捷键: Ctrl + Enter',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.outline,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
 
               // 错误信息
               if (_error != null)
-                Padding(
-                  padding: EdgeInsets.symmetric(vertical: spacing),
-                  child: Text(
-                    _error!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
+                Card(
+                  elevation: platformService.getPlatformElevation(),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.errorContainer.withOpacity(0.2),
+                  margin: EdgeInsets.symmetric(vertical: spacing),
+                  child: Padding(
+                    padding: EdgeInsets.all(spacing),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.error_outline,
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '错误',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.error,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _error!,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                        ),
+                      ],
                     ),
-                    textAlign: TextAlign.center,
                   ),
                 ),
+
+              // 比较结果预览
+              if (_comparisonResults != null && _comparisonResults!.isNotEmpty)
+                _buildComparisonResultPreview(platformService, spacing),
             ],
           ),
         ),
@@ -408,6 +742,10 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
         padding: EdgeInsets.all(spacing),
         child: Column(
           children: [
+            // 快捷键提示
+            _buildShortcutHint(platformService),
+            SizedBox(height: spacing),
+
             // 连接选择区域
             Row(
               children: [
@@ -446,9 +784,33 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                         children: [
                           Padding(
                             padding: EdgeInsets.all(spacing),
-                            child: Text(
-                              '源数据库: ${_sourceConnection?.name ?? "未选择"}',
-                              style: Theme.of(context).textTheme.titleMedium,
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    '源数据库: ${_sourceConnection?.name ?? "未选择"}',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.titleMedium,
+                                  ),
+                                ),
+                                if (_sourceDatabase != null &&
+                                    _sourceCollection != null)
+                                  Chip(
+                                    label: Text(
+                                      '$_sourceDatabase.$_sourceCollection',
+                                    ),
+                                    backgroundColor: Theme.of(
+                                      context,
+                                    ).colorScheme.primaryContainer,
+                                    labelStyle: TextStyle(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onPrimaryContainer,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                           const Divider(height: 1),
@@ -459,6 +821,8 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                                     connection: _sourceConnection!,
                                     onCollectionSelected:
                                         _handleSourceCollectionSelected,
+                                    selectedDatabase: _sourceDatabase,
+                                    selectedCollection: _sourceCollection,
                                   ),
                           ),
                         ],
@@ -476,9 +840,33 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                         children: [
                           Padding(
                             padding: EdgeInsets.all(spacing),
-                            child: Text(
-                              '目标数据库: ${_targetConnection?.name ?? "未选择"}',
-                              style: Theme.of(context).textTheme.titleMedium,
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    '目标数据库: ${_targetConnection?.name ?? "未选择"}',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.titleMedium,
+                                  ),
+                                ),
+                                if (_targetDatabase != null &&
+                                    _targetCollection != null)
+                                  Chip(
+                                    label: Text(
+                                      '$_targetDatabase.$_targetCollection',
+                                    ),
+                                    backgroundColor: Theme.of(
+                                      context,
+                                    ).colorScheme.secondaryContainer,
+                                    labelStyle: TextStyle(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSecondaryContainer,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                           const Divider(height: 1),
@@ -489,6 +877,8 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                                     connection: _targetConnection!,
                                     onCollectionSelected:
                                         _handleTargetCollectionSelected,
+                                    selectedDatabase: _targetDatabase,
+                                    selectedCollection: _targetCollection,
                                   ),
                           ),
                         ],
@@ -500,72 +890,126 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
             ),
             SizedBox(height: spacing),
 
-            // 比较规则选择区域
-            Card(
-              elevation: platformService.getPlatformElevation(),
-              child: Padding(
-                padding: EdgeInsets.all(spacing),
-                child: Row(
-                  children: [
-                    Text(
-                      '比较规则:',
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                    SizedBox(width: spacing),
-                    Expanded(child: _buildRuleSelector()),
-                    SizedBox(width: spacing),
-                    TextButton.icon(
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => const RuleListScreen(),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.rule),
-                      label: const Text('管理规则'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            SizedBox(height: spacing),
-
-            // 比较操作区域
+            // 底部操作区域
             Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ElevatedButton.icon(
-                  onPressed: _isComparing
-                      ? null
-                      : (_sourceCollection != null && _targetCollection != null)
-                      ? _compareCollections
-                      : null,
-                  icon: _isComparing
-                      ? SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Theme.of(context).colorScheme.onPrimary,
+                // 比较规则选择区域
+                Expanded(
+                  child: Card(
+                    elevation: platformService.getPlatformElevation(),
+                    child: Padding(
+                      padding: EdgeInsets.all(spacing),
+                      child: Row(
+                        children: [
+                          Text(
+                            '比较规则:',
+                            style: Theme.of(context).textTheme.titleSmall,
                           ),
-                        )
-                      : const Icon(Icons.compare_arrows),
-                  label: const Text('比较集合'),
+                          SizedBox(width: spacing),
+                          Expanded(child: _buildRuleSelector()),
+                          SizedBox(width: spacing),
+                          TextButton.icon(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => const RuleListScreen(),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.rule),
+                            label: const Text('管理规则'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+                SizedBox(width: spacing),
+
+                // 比较操作区域
+                Card(
+                  elevation: platformService.getPlatformElevation(),
+                  child: Padding(
+                    padding: EdgeInsets.all(spacing),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed: _isComparing
+                              ? null
+                              : (_sourceCollection != null &&
+                                    _targetCollection != null)
+                              ? _compareCollections
+                              : null,
+                          icon: _isComparing
+                              ? SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onPrimary,
+                                  ),
+                                )
+                              : const Icon(Icons.compare_arrows),
+                          label: Text(_isComparing ? '正在比较...' : '比较集合'),
+                        ),
+
+                        if (_sourceCollection == null ||
+                            _targetCollection == null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Text(
+                              '请先选择源和目标集合',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.outline,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
 
             // 错误信息
             if (_error != null)
-              Padding(
-                padding: EdgeInsets.symmetric(vertical: spacing / 2),
-                child: Text(
-                  _error!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                  textAlign: TextAlign.center,
+              Card(
+                elevation: platformService.getPlatformElevation(),
+                color: Theme.of(
+                  context,
+                ).colorScheme.errorContainer.withOpacity(0.2),
+                margin: EdgeInsets.only(top: spacing),
+                child: Padding(
+                  padding: EdgeInsets.all(spacing),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _error!,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
+
+            // 比较结果预览
+            if (_comparisonResults != null && _comparisonResults!.isNotEmpty)
+              _buildComparisonResultPreview(platformService, spacing),
           ],
         ),
       ),
