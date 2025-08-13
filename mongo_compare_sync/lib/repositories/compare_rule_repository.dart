@@ -1,5 +1,9 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import '../models/compare_rule.dart';
 import '../models/hive_adapters.dart';
@@ -48,6 +52,106 @@ class CompareRuleRepository {
   // 删除比较规则
   Future<void> deleteRule(String id) async {
     await _rulesBox.delete(id);
+  }
+
+  // 导出所有规则到JSON字符串
+  String exportRulesToJson() {
+    final rules = getAllRules();
+    final List<Map<String, dynamic>> rulesJson = [];
+
+    for (var rule in rules) {
+      final Map<String, dynamic> ruleMap = {
+        'name': rule.name,
+        'description': rule.description,
+        'fieldRules': rule.fieldRules
+            .map(
+              (fr) => {
+                'fieldPath': fr.fieldPath,
+                'ruleType': fr.ruleType.index,
+                'pattern': fr.pattern,
+                'transformFunction': fr.transformFunction,
+                'isRegex': fr.isRegex,
+              },
+            )
+            .toList(),
+      };
+      rulesJson.add(ruleMap);
+    }
+
+    return jsonEncode(rulesJson);
+  }
+
+  // 从JSON字符串导入规则
+  Future<List<CompareRule>> importRulesFromJson(String jsonString) async {
+    try {
+      final List<dynamic> rulesJson = jsonDecode(jsonString);
+      final List<CompareRule> importedRules = [];
+
+      for (var ruleJson in rulesJson) {
+        final List<FieldRule> fieldRules = [];
+
+        for (var frJson in ruleJson['fieldRules']) {
+          fieldRules.add(
+            FieldRule(
+              fieldPath: frJson['fieldPath'],
+              ruleType: RuleType.values[frJson['ruleType']],
+              pattern: frJson['pattern'],
+              transformFunction: frJson['transformFunction'],
+              isRegex: frJson['isRegex'],
+            ),
+          );
+        }
+
+        final rule = CompareRule(
+          id: const Uuid().v4(), // 生成新的ID
+          name: ruleJson['name'],
+          description: ruleJson['description'],
+          fieldRules: fieldRules,
+        );
+
+        // 保存导入的规则
+        await saveRule(rule);
+        importedRules.add(rule);
+      }
+
+      return importedRules;
+    } catch (e) {
+      print('导入规则失败: $e');
+      return [];
+    }
+  }
+
+  // 导出规则到文件
+  Future<String?> exportRulesToFile() async {
+    try {
+      final jsonString = exportRulesToJson();
+
+      // 获取应用文档目录
+      final directory = await getApplicationDocumentsDirectory();
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final filePath = '${directory.path}/mongo_compare_rules_$timestamp.json';
+
+      // 写入文件
+      final file = File(filePath);
+      await file.writeAsString(jsonString);
+
+      return filePath;
+    } catch (e) {
+      print('导出规则到文件失败: $e');
+      return null;
+    }
+  }
+
+  // 从文件导入规则
+  Future<List<CompareRule>> importRulesFromFile(String filePath) async {
+    try {
+      final file = File(filePath);
+      final jsonString = await file.readAsString();
+      return importRulesFromJson(jsonString);
+    } catch (e) {
+      print('从文件导入规则失败: $e');
+      return [];
+    }
   }
 }
 

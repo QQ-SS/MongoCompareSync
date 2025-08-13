@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:file_picker/file_picker.dart';
+import 'dart:io';
 import '../models/compare_rule.dart';
 import '../providers/rule_provider.dart';
+import '../repositories/compare_rule_repository.dart';
 import 'rule_edit_screen.dart';
 
 class RuleListScreen extends ConsumerStatefulWidget {
@@ -27,6 +31,19 @@ class _RuleListScreenState extends ConsumerState<RuleListScreen> {
       appBar: AppBar(
         title: const Text('比较规则管理'),
         actions: [
+          // 导入按钮
+          IconButton(
+            icon: const Icon(Icons.file_upload),
+            tooltip: '导入规则',
+            onPressed: () => _importRules(context),
+          ),
+          // 导出按钮
+          IconButton(
+            icon: const Icon(Icons.file_download),
+            tooltip: '导出规则',
+            onPressed: () => _exportRules(context),
+          ),
+          // 添加按钮
           IconButton(
             icon: const Icon(Icons.add),
             tooltip: '创建新规则',
@@ -130,7 +147,8 @@ class _RuleListScreenState extends ConsumerState<RuleListScreen> {
           ),
           TextButton(
             onPressed: () {
-              ref.read(ruleRepositoryProvider).deleteRule(rule.id);
+              // 使用rulesProvider.notifier来删除规则，这样UI会自动更新
+              ref.read(rulesProvider.notifier).deleteRule(rule.id);
               Navigator.of(context).pop();
             },
             child: const Text('删除'),
@@ -138,5 +156,100 @@ class _RuleListScreenState extends ConsumerState<RuleListScreen> {
         ],
       ),
     );
+  }
+
+  // 导入规则
+  Future<void> _importRules(BuildContext context) async {
+    try {
+      // 使用FilePicker让用户选择JSON文件
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+        dialogTitle: '选择要导入的规则文件',
+      );
+
+      if (result == null || result.files.isEmpty) {
+        // 用户取消了选择
+        return;
+      }
+
+      final file = result.files.first;
+      String? filePath = file.path;
+
+      if (filePath == null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('无法获取文件路径')));
+        return;
+      }
+
+      // 导入规则
+      final importedRules = await ref
+          .read(ruleRepositoryProvider)
+          .importRulesFromFile(filePath);
+
+      if (importedRules.isNotEmpty) {
+        // 刷新规则列表
+        ref.read(rulesProvider.notifier).refreshRules();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('成功导入 ${importedRules.length} 条规则')),
+        );
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('导入规则失败或文件不包含有效规则')));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('导入规则失败: $e')));
+    }
+  }
+
+  // 导出规则
+  Future<void> _exportRules(BuildContext context) async {
+    try {
+      // 获取规则的JSON字符串
+      final jsonString = ref.read(ruleRepositoryProvider).exportRulesToJson();
+
+      if (jsonString.isEmpty) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('没有规则可导出')));
+        return;
+      }
+
+      // 使用FilePicker让用户选择保存位置
+      String? outputPath = await FilePicker.platform.saveFile(
+        dialogTitle: '选择保存位置',
+        fileName:
+            'mongo_compare_rules_${DateTime.now().millisecondsSinceEpoch}.json',
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+      );
+
+      if (outputPath == null) {
+        // 用户取消了选择
+        return;
+      }
+
+      // 确保文件名以.json结尾
+      if (!outputPath.endsWith('.json')) {
+        outputPath = '$outputPath.json';
+      }
+
+      // 写入文件
+      final file = File(outputPath);
+      await file.writeAsString(jsonString);
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('规则已导出到: $outputPath')));
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('导出规则失败: $e')));
+    }
   }
 }

@@ -24,7 +24,8 @@
     "provider",
     "flutter_riverpod",
     "freezed",
-    "hive"
+    "hive",
+    "file_picker"
   ],
   "platforms": [
     "MacOS",
@@ -66,9 +67,9 @@ Note:
 
 [X] 开发自定义比较规则配置界面
 
-[/] 实现规则保存和加载功能
+[X] 实现规则保存和加载功能
 
-[ ] 添加连接配置的本地存储功能
+[/] 添加连接配置的本地存储功能
 
 [ ] 实现应用设置和首选项功能
 
