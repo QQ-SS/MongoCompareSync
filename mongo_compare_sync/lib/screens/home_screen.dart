@@ -4,6 +4,8 @@ import '../screens/connection_screen.dart';
 import '../screens/compare_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/rule_list_screen.dart';
+import '../widgets/responsive_layout.dart';
+import '../services/platform_service.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -36,27 +38,118 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('MongoDB比较同步工具'),
-        centerTitle: true,
-        elevation: 0,
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Theme.of(context).colorScheme.onPrimary,
-      ),
-      body: _pages[_selectedIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        items: _navItems,
-        currentIndex: _selectedIndex,
-        selectedItemColor: Theme.of(context).colorScheme.primary,
-        unselectedItemColor: Theme.of(
-          context,
-        ).colorScheme.onSurface.withOpacity(0.6),
-        onTap: (index) {
+    final platformService = PlatformService.instance;
+    final isLargeScreen = ResponsiveLayoutUtil.isLargeScreen(context);
+    final isMediumScreen = ResponsiveLayoutUtil.isMediumScreen(context);
+
+    // 为大屏幕创建侧边导航栏
+    Widget buildNavigationRail() {
+      return NavigationRail(
+        selectedIndex: _selectedIndex,
+        onDestinationSelected: (index) {
           setState(() {
             _selectedIndex = index;
           });
         },
+        labelType: NavigationRailLabelType.all,
+        destinations: [
+          NavigationRailDestination(
+            icon: const Icon(Icons.storage),
+            label: const Text('连接管理'),
+          ),
+          NavigationRailDestination(
+            icon: const Icon(Icons.compare_arrows),
+            label: const Text('比较同步'),
+          ),
+          NavigationRailDestination(
+            icon: const Icon(Icons.rule),
+            label: const Text('比较规则'),
+          ),
+          NavigationRailDestination(
+            icon: const Icon(Icons.settings),
+            label: const Text('设置'),
+          ),
+        ],
+      );
+    }
+
+    // 响应式布局
+    return ResponsiveLayout(
+      // 小屏幕布局 - 使用底部导航栏
+      small: Scaffold(
+        appBar: AppBar(
+          title: const Text('MongoDB比较同步工具'),
+          centerTitle: true,
+          elevation: 0,
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          foregroundColor: Theme.of(context).colorScheme.onPrimary,
+        ),
+        body: _pages[_selectedIndex],
+        bottomNavigationBar: BottomNavigationBar(
+          items: _navItems,
+          currentIndex: _selectedIndex,
+          selectedItemColor: Theme.of(context).colorScheme.primary,
+          unselectedItemColor: Theme.of(
+            context,
+          ).colorScheme.onSurface.withOpacity(0.6),
+          onTap: (index) {
+            setState(() {
+              _selectedIndex = index;
+            });
+          },
+          type: BottomNavigationBarType.fixed,
+        ),
+      ),
+
+      // 中等屏幕布局 - 使用侧边导航栏
+      medium: Scaffold(
+        body: Row(
+          children: [
+            buildNavigationRail(),
+            const VerticalDivider(thickness: 1, width: 1),
+            Expanded(
+              child: Scaffold(
+                appBar: AppBar(
+                  title: const Text('MongoDB比较同步工具'),
+                  centerTitle: true,
+                  elevation: 0,
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                ),
+                body: _pages[_selectedIndex],
+              ),
+            ),
+          ],
+        ),
+      ),
+
+      // 大屏幕布局 - 使用侧边导航栏和更宽的布局
+      large: Scaffold(
+        body: Row(
+          children: [
+            buildNavigationRail(),
+            const VerticalDivider(thickness: 1, width: 1),
+            Expanded(
+              child: Scaffold(
+                appBar: AppBar(
+                  title: const Text('MongoDB比较同步工具'),
+                  centerTitle: true,
+                  elevation: 0,
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                ),
+                body: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: ResponsiveLayoutUtil.getResponsiveSpacing(
+                      context,
+                    ),
+                  ),
+                  child: _pages[_selectedIndex],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -7,6 +7,9 @@ import '../models/compare_rule.dart';
 import '../providers/connection_provider.dart';
 import '../providers/rule_provider.dart';
 import '../widgets/database_browser.dart';
+import '../widgets/responsive_layout.dart';
+import '../widgets/loading_indicator.dart';
+import '../services/platform_service.dart';
 import 'comparison_result_screen.dart';
 import 'rule_list_screen.dart';
 
@@ -37,18 +40,20 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
   }
 
   void _loadConnections() {
-    final connections = ref.read(connectionsProvider);
-    if (connections.isNotEmpty) {
-      setState(() {
-        _sourceConnection = connections.first;
-      });
-
-      if (connections.length > 1) {
+    final connectionsState = ref.read(connectionsProvider);
+    connectionsState.whenData((connections) {
+      if (connections.isNotEmpty) {
         setState(() {
-          _targetConnection = connections[1];
+          _sourceConnection = connections.first;
         });
+
+        if (connections.length > 1) {
+          setState(() {
+            _targetConnection = connections[1];
+          });
+        }
       }
-    }
+    });
   }
 
   void _handleSourceConnectionChanged(MongoConnection? connection) {
@@ -144,59 +149,267 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final connections = ref.watch(connectionsProvider);
-    final connectedConnections = connections
-        .where((conn) => conn.isConnected)
-        .toList();
+    final connectionsState = ref.watch(connectionsProvider);
+    final platformService = PlatformService.instance;
+    final isSmallScreen = ResponsiveLayoutUtil.isSmallScreen(context);
+    final spacing = ResponsiveLayoutUtil.getResponsiveSpacing(context);
 
-    if (connectedConnections.isEmpty) {
-      return Center(
+    return connectionsState.when(
+      data: (connections) {
+        final connectedConnections = connections
+            .where((conn) => conn.isConnected)
+            .toList();
+
+        if (connectedConnections.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.warning_amber_rounded,
+                  size: 64,
+                  color: Colors.amber,
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  '没有活跃的数据库连接',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  '请先在连接管理页面连接至少一个数据库',
+                  style: TextStyle(fontSize: 16, color: Colors.grey),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  icon: const Icon(Icons.link),
+                  label: const Text('前往连接管理'),
+                ),
+              ],
+            ),
+          );
+        }
+
+        // 响应式布局
+        return ResponsiveLayout(
+          // 小屏幕布局 - 垂直排列
+          small: _buildSmallScreenLayout(
+            connectedConnections,
+            platformService,
+            spacing,
+          ),
+
+          // 中等屏幕和大屏幕布局 - 水平排列
+          medium: _buildLargeScreenLayout(
+            connectedConnections,
+            platformService,
+            spacing,
+          ),
+
+          // 大屏幕布局与中等屏幕相同，但可能有不同的间距
+          large: null,
+        );
+      },
+      loading: () => const Center(
+        child: LoadingIndicator(message: '加载连接信息...', size: 40.0),
+      ),
+      error: (error, stackTrace) => Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.warning_amber_rounded,
-              size: 64,
-              color: Colors.amber,
+            const Icon(Icons.error_outline, color: Colors.red, size: 48),
+            const SizedBox(height: 16),
+            Text('加载连接失败', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Text(
+              error.toString(),
+              style: Theme.of(context).textTheme.bodyMedium,
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
-            const Text(
-              '没有活跃的数据库连接',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              '请先在连接管理页面连接至少一个数据库',
-              style: TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
+            ElevatedButton(
               onPressed: () {
-                // 切换到连接管理页面
-                // 这里我们假设HomeScreen使用BottomNavigationBar，索引0是连接管理页面
-                // 实际实现可能需要根据导航结构调整
-                // 这里使用简单的方式，通过全局状态管理来切换页面
-                // 在实际应用中，可能需要使用更复杂的导航管理
-                // 例如使用GoRouter或AutoRoute等路由管理库
-                // 或者使用Provider来管理当前选中的页面索引
-                // 这里我们简单地使用Navigator来导航回上一页
-                Navigator.of(context).pop();
+                ref.read(connectionsProvider.notifier).refreshConnections();
               },
-              icon: const Icon(Icons.link),
-              label: const Text('前往连接管理'),
+              child: const Text('重试'),
             ),
           ],
         ),
-      );
-    }
+      ),
+    );
+  }
 
+  // 小屏幕布局
+  Widget _buildSmallScreenLayout(
+    List<MongoConnection> connectedConnections,
+    PlatformService platformService,
+    double spacing,
+  ) {
     return Scaffold(
-      body: Column(
-        children: [
-          // 连接选择区域
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: EdgeInsets.all(spacing),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 连接选择区域
+              _buildConnectionSelector(
+                '源数据库',
+                _sourceConnection,
+                connectedConnections,
+                _handleSourceConnectionChanged,
+              ),
+              SizedBox(height: spacing),
+
+              // 源数据库浏览器
+              Card(
+                elevation: platformService.getPlatformElevation(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.all(spacing),
+                      child: Text(
+                        '源数据库: ${_sourceConnection?.name ?? "未选择"}',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    SizedBox(
+                      height: 200,
+                      child: _sourceConnection == null
+                          ? const Center(child: Text('请选择源数据库连接'))
+                          : DatabaseBrowser(
+                              connection: _sourceConnection!,
+                              onCollectionSelected:
+                                  _handleSourceCollectionSelected,
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: spacing),
+
+              // 目标连接选择
+              _buildConnectionSelector(
+                '目标数据库',
+                _targetConnection,
+                connectedConnections,
+                _handleTargetConnectionChanged,
+              ),
+              SizedBox(height: spacing),
+
+              // 目标数据库浏览器
+              Card(
+                elevation: platformService.getPlatformElevation(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.all(spacing),
+                      child: Text(
+                        '目标数据库: ${_targetConnection?.name ?? "未选择"}',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    SizedBox(
+                      height: 200,
+                      child: _targetConnection == null
+                          ? const Center(child: Text('请选择目标数据库连接'))
+                          : DatabaseBrowser(
+                              connection: _targetConnection!,
+                              onCollectionSelected:
+                                  _handleTargetCollectionSelected,
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: spacing),
+
+              // 比较规则选择区域
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('比较规则:', style: Theme.of(context).textTheme.titleSmall),
+                  SizedBox(height: spacing / 2),
+                  _buildRuleSelector(),
+                  SizedBox(height: spacing / 2),
+                  Center(
+                    child: TextButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const RuleListScreen(),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.rule),
+                      label: const Text('管理规则'),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: spacing),
+
+              // 比较操作区域
+              Center(
+                child: ElevatedButton.icon(
+                  onPressed: _isComparing
+                      ? null
+                      : (_sourceCollection != null && _targetCollection != null)
+                      ? _compareCollections
+                      : null,
+                  icon: _isComparing
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Theme.of(context).colorScheme.onPrimary,
+                          ),
+                        )
+                      : const Icon(Icons.compare_arrows),
+                  label: const Text('比较集合'),
+                ),
+              ),
+
+              // 错误信息
+              if (_error != null)
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: spacing),
+                  child: Text(
+                    _error!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 大屏幕布局
+  Widget _buildLargeScreenLayout(
+    List<MongoConnection> connectedConnections,
+    PlatformService platformService,
+    double spacing,
+  ) {
+    return Scaffold(
+      body: Padding(
+        padding: EdgeInsets.all(spacing),
+        child: Column(
+          children: [
+            // 连接选择区域
+            Row(
               children: [
                 Expanded(
                   child: _buildConnectionSelector(
@@ -206,7 +419,7 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                     _handleSourceConnectionChanged,
                   ),
                 ),
-                const SizedBox(width: 16),
+                SizedBox(width: spacing),
                 Expanded(
                   child: _buildConnectionSelector(
                     '目标数据库',
@@ -217,88 +430,90 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                 ),
               ],
             ),
-          ),
+            SizedBox(height: spacing),
 
-          // 数据库浏览器区域
-          Expanded(
-            child: Row(
-              children: [
-                // 源数据库浏览器
-                Expanded(
-                  child: Card(
-                    margin: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Text(
-                            '源数据库: ${_sourceConnection?.name ?? "未选择"}',
-                            style: Theme.of(context).textTheme.titleMedium,
+            // 数据库浏览器区域
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // 源数据库浏览器
+                  Expanded(
+                    child: Card(
+                      elevation: platformService.getPlatformElevation(),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: EdgeInsets.all(spacing),
+                            child: Text(
+                              '源数据库: ${_sourceConnection?.name ?? "未选择"}',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
                           ),
-                        ),
-                        const Divider(),
-                        Expanded(
-                          child: _sourceConnection == null
-                              ? const Center(child: Text('请选择源数据库连接'))
-                              : DatabaseBrowser(
-                                  connection: _sourceConnection!,
-                                  onCollectionSelected:
-                                      _handleSourceCollectionSelected,
-                                ),
-                        ),
-                      ],
+                          const Divider(height: 1),
+                          Expanded(
+                            child: _sourceConnection == null
+                                ? const Center(child: Text('请选择源数据库连接'))
+                                : DatabaseBrowser(
+                                    connection: _sourceConnection!,
+                                    onCollectionSelected:
+                                        _handleSourceCollectionSelected,
+                                  ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
+                  SizedBox(width: spacing),
 
-                // 目标数据库浏览器
-                Expanded(
-                  child: Card(
-                    margin: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Text(
-                            '目标数据库: ${_targetConnection?.name ?? "未选择"}',
-                            style: Theme.of(context).textTheme.titleMedium,
+                  // 目标数据库浏览器
+                  Expanded(
+                    child: Card(
+                      elevation: platformService.getPlatformElevation(),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: EdgeInsets.all(spacing),
+                            child: Text(
+                              '目标数据库: ${_targetConnection?.name ?? "未选择"}',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
                           ),
-                        ),
-                        const Divider(),
-                        Expanded(
-                          child: _targetConnection == null
-                              ? const Center(child: Text('请选择目标数据库连接'))
-                              : DatabaseBrowser(
-                                  connection: _targetConnection!,
-                                  onCollectionSelected:
-                                      _handleTargetCollectionSelected,
-                                ),
-                        ),
-                      ],
+                          const Divider(height: 1),
+                          Expanded(
+                            child: _targetConnection == null
+                                ? const Center(child: Text('请选择目标数据库连接'))
+                                : DatabaseBrowser(
+                                    connection: _targetConnection!,
+                                    onCollectionSelected:
+                                        _handleTargetCollectionSelected,
+                                  ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
+            SizedBox(height: spacing),
 
-          // 比较规则选择区域
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+            // 比较规则选择区域
+            Card(
+              elevation: platformService.getPlatformElevation(),
+              child: Padding(
+                padding: EdgeInsets.all(spacing),
+                child: Row(
                   children: [
                     Text(
                       '比较规则:',
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
-                    const SizedBox(width: 16),
+                    SizedBox(width: spacing),
                     Expanded(child: _buildRuleSelector()),
-                    const SizedBox(width: 16),
+                    SizedBox(width: spacing),
                     TextButton.icon(
                       onPressed: () {
                         Navigator.of(context).push(
@@ -312,14 +527,12 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                     ),
                   ],
                 ),
-              ],
+              ),
             ),
-          ),
+            SizedBox(height: spacing),
 
-          // 比较操作区域
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
+            // 比较操作区域
+            Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 ElevatedButton.icon(
@@ -329,28 +542,32 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                       ? _compareCollections
                       : null,
                   icon: _isComparing
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 20,
                           height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Theme.of(context).colorScheme.onPrimary,
+                          ),
                         )
                       : const Icon(Icons.compare_arrows),
                   label: const Text('比较集合'),
                 ),
               ],
             ),
-          ),
 
-          // 比较结果区域
-          if (_error != null)
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(
-                _error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
+            // 错误信息
+            if (_error != null)
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: spacing / 2),
+                child: Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                  textAlign: TextAlign.center,
+                ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }

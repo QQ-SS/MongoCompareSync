@@ -4,6 +4,9 @@ import '../models/connection.dart';
 import '../providers/connection_provider.dart';
 import '../widgets/connection_form.dart';
 import '../widgets/connection_list.dart';
+import '../widgets/responsive_layout.dart';
+import '../widgets/loading_indicator.dart';
+import '../services/platform_service.dart';
 
 class ConnectionScreen extends ConsumerStatefulWidget {
   const ConnectionScreen({super.key});
@@ -181,47 +184,141 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Column(
-        children: [
-          // 连接表单/详情区域
-          Expanded(
-            flex: 2,
-            child: Card(
-              margin: const EdgeInsets.all(16.0),
-              elevation: 4,
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: _buildConnectionForm(),
+  // 构建加载状态的连接列表
+  Widget _buildConnectionListWithLoading() {
+    return Consumer(
+      builder: (context, ref, child) {
+        final connectionsState = ref.watch(connectionsProvider);
+
+        return connectionsState.when(
+          data: (_) => ConnectionList(
+            onConnectionSelected: _handleConnectionSelected,
+            onEditConnection: _handleEditConnection,
+            onDeleteConnection: _handleDeleteConnection,
+          ),
+          loading: () => Column(
+            children: [
+              Expanded(
+                child: LoadingIndicator(message: '加载连接列表...', size: 32.0),
               ),
+            ],
+          ),
+          error: (error, stackTrace) => Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                const SizedBox(height: 16),
+                Text('加载连接失败', style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 8),
+                Text(
+                  error.toString(),
+                  style: Theme.of(context).textTheme.bodyMedium,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: _refreshConnections,
+                  child: const Text('重试'),
+                ),
+              ],
             ),
           ),
+        );
+      },
+    );
+  }
 
-          // 连接列表区域
-          Expanded(
-            flex: 3,
-            child: Card(
-              margin: const EdgeInsets.all(16.0),
-              elevation: 4,
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: ConnectionList(
-                  onConnectionSelected: _handleConnectionSelected,
-                  onEditConnection: _handleEditConnection,
-                  onDeleteConnection: _handleDeleteConnection,
+  @override
+  Widget build(BuildContext context) {
+    final platformService = PlatformService.instance;
+    final padding = platformService.getPlatformPadding();
+    final isLargeScreen = ResponsiveLayoutUtil.isLargeScreen(context);
+    final isMediumScreen = ResponsiveLayoutUtil.isMediumScreen(context);
+
+    // 响应式布局
+    return ResponsiveLayout(
+      // 小屏幕布局 - 垂直排列
+      small: Scaffold(
+        body: Column(
+          children: [
+            // 连接表单/详情区域
+            Expanded(
+              flex: 2,
+              child: Card(
+                margin: EdgeInsets.all(
+                  ResponsiveLayoutUtil.getResponsiveSpacing(context) / 2,
+                ),
+                elevation: platformService.getPlatformElevation(),
+                child: Padding(padding: padding, child: _buildConnectionForm()),
+              ),
+            ),
+
+            // 连接列表区域
+            Expanded(
+              flex: 3,
+              child: Card(
+                margin: EdgeInsets.all(
+                  ResponsiveLayoutUtil.getResponsiveSpacing(context) / 2,
+                ),
+                elevation: platformService.getPlatformElevation(),
+                child: Padding(
+                  padding: padding,
+                  child: _buildConnectionListWithLoading(),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: _handleAddConnection,
+          tooltip: '添加新连接',
+          child: const Icon(Icons.add),
+        ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _handleAddConnection,
-        tooltip: '添加新连接',
-        child: const Icon(Icons.add),
+
+      // 中等屏幕和大屏幕布局 - 水平排列
+      medium: Scaffold(
+        body: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 连接列表区域
+            Expanded(
+              flex: 2,
+              child: Card(
+                margin: EdgeInsets.all(
+                  ResponsiveLayoutUtil.getResponsiveSpacing(context),
+                ),
+                elevation: platformService.getPlatformElevation(),
+                child: Padding(
+                  padding: padding,
+                  child: _buildConnectionListWithLoading(),
+                ),
+              ),
+            ),
+
+            // 连接表单/详情区域
+            Expanded(
+              flex: 3,
+              child: Card(
+                margin: EdgeInsets.all(
+                  ResponsiveLayoutUtil.getResponsiveSpacing(context),
+                ),
+                elevation: platformService.getPlatformElevation(),
+                child: Padding(padding: padding, child: _buildConnectionForm()),
+              ),
+            ),
+          ],
+        ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: _handleAddConnection,
+          tooltip: '添加新连接',
+          child: const Icon(Icons.add),
+        ),
       ),
+
+      // 大屏幕布局与中等屏幕相同，但可能有不同的间距
+      large: null,
     );
   }
 }

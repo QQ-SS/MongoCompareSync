@@ -17,7 +17,10 @@ final connectionRepositoryProvider = Provider<ConnectionRepository>((ref) {
 
 // 连接列表提供者
 final connectionsProvider =
-    StateNotifierProvider<ConnectionsNotifier, List<MongoConnection>>((ref) {
+    StateNotifierProvider<
+      ConnectionsNotifier,
+      AsyncValue<List<MongoConnection>>
+    >((ref) {
       final repository = ref.watch(connectionRepositoryProvider);
       return ConnectionsNotifier(repository);
     });
@@ -36,17 +39,23 @@ final connectionStateProvider = StateProvider<ConnectionState>(
 enum ConnectionState { connecting, connected, disconnected, error }
 
 // 连接列表状态管理
-class ConnectionsNotifier extends StateNotifier<List<MongoConnection>> {
+class ConnectionsNotifier
+    extends StateNotifier<AsyncValue<List<MongoConnection>>> {
   final ConnectionRepository _repository;
 
-  ConnectionsNotifier(this._repository) : super([]) {
+  ConnectionsNotifier(this._repository) : super(const AsyncValue.loading()) {
     _loadConnections();
   }
 
   // 加载所有保存的连接
   Future<void> _loadConnections() async {
-    final connections = _repository.getAllConnections();
-    state = connections;
+    try {
+      state = const AsyncValue.loading();
+      final connections = _repository.getAllConnections();
+      state = AsyncValue.data(connections);
+    } catch (error, stackTrace) {
+      state = AsyncValue.error(error, stackTrace);
+    }
   }
 
   // 刷新连接列表
@@ -56,23 +65,43 @@ class ConnectionsNotifier extends StateNotifier<List<MongoConnection>> {
 
   // 添加新连接
   Future<void> addConnection(MongoConnection connection) async {
-    await _repository.saveConnection(connection);
-    state = [...state, connection];
+    try {
+      await _repository.saveConnection(connection);
+      state.whenData((connections) {
+        state = AsyncValue.data([...connections, connection]);
+      });
+    } catch (error, stackTrace) {
+      state = AsyncValue.error(error, stackTrace);
+    }
   }
 
   // 更新连接
   Future<void> updateConnection(MongoConnection connection) async {
-    await _repository.saveConnection(connection);
-    state = [
-      for (final conn in state)
-        if (conn.id == connection.id) connection else conn,
-    ];
+    try {
+      await _repository.saveConnection(connection);
+      state.whenData((connections) {
+        state = AsyncValue.data([
+          for (final conn in connections)
+            if (conn.id == connection.id) connection else conn,
+        ]);
+      });
+    } catch (error, stackTrace) {
+      state = AsyncValue.error(error, stackTrace);
+    }
   }
 
   // 删除连接
   Future<void> deleteConnection(String id) async {
-    await _repository.deleteConnection(id);
-    state = state.where((conn) => conn.id != id).toList();
+    try {
+      await _repository.deleteConnection(id);
+      state.whenData((connections) {
+        state = AsyncValue.data(
+          connections.where((conn) => conn.id != id).toList(),
+        );
+      });
+    } catch (error, stackTrace) {
+      state = AsyncValue.error(error, stackTrace);
+    }
   }
 
   // 测试连接
