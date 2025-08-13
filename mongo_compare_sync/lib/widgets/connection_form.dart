@@ -120,144 +120,146 @@ class _ConnectionFormState extends ConsumerState<ConnectionForm> {
   Widget build(BuildContext context) {
     return Form(
       key: _formKey,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          TextFormField(
-            controller: _nameController,
-            decoration: const InputDecoration(
-              labelText: '连接名称',
-              hintText: '输入一个易于识别的名称',
-              prefixIcon: Icon(Icons.label),
-            ),
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return '请输入连接名称';
-              }
-              return null;
-            },
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _hostController,
-            decoration: const InputDecoration(
-              labelText: '主机地址',
-              hintText: '例如: localhost 或 192.168.1.100',
-              prefixIcon: Icon(Icons.computer),
-            ),
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return '请输入主机地址';
-              }
-              return null;
-            },
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _portController,
-            decoration: const InputDecoration(
-              labelText: '端口',
-              hintText: '默认: 27017',
-              prefixIcon: Icon(Icons.settings_ethernet),
-            ),
-            keyboardType: TextInputType.number,
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return '请输入端口号';
-              }
-              final port = int.tryParse(value);
-              if (port == null || port <= 0 || port > 65535) {
-                return '请输入有效的端口号 (1-65535)';
-              }
-              return null;
-            },
-          ),
-          const SizedBox(height: 16),
-          SwitchListTile(
-            title: const Text('启用身份验证'),
-            value: _isAuthEnabled,
-            onChanged: (value) {
-              setState(() {
-                _isAuthEnabled = value;
-              });
-            },
-          ),
-          if (_isAuthEnabled) ...[
-            const SizedBox(height: 16),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
             TextFormField(
-              controller: _usernameController,
+              controller: _nameController,
               decoration: const InputDecoration(
-                labelText: '用户名',
-                prefixIcon: Icon(Icons.person),
+                labelText: '连接名称',
+                hintText: '输入一个易于识别的名称',
+                prefixIcon: Icon(Icons.label),
               ),
               validator: (value) {
-                if (_isAuthEnabled && (value == null || value.isEmpty)) {
-                  return '请输入用户名';
+                if (value == null || value.isEmpty) {
+                  return '请输入连接名称';
                 }
                 return null;
               },
             ),
             const SizedBox(height: 16),
             TextFormField(
-              controller: _passwordController,
+              controller: _hostController,
               decoration: const InputDecoration(
-                labelText: '密码',
-                prefixIcon: Icon(Icons.lock),
+                labelText: '主机地址',
+                hintText: '例如: localhost 或 192.168.1.100',
+                prefixIcon: Icon(Icons.computer),
               ),
-              obscureText: true,
               validator: (value) {
-                if (_isAuthEnabled && (value == null || value.isEmpty)) {
-                  return '请输入密码';
+                if (value == null || value.isEmpty) {
+                  return '请输入主机地址';
                 }
                 return null;
               },
             ),
-          ],
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _databaseController,
-            decoration: const InputDecoration(
-              labelText: '数据库名称 (可选)',
-              hintText: '留空以列出所有数据库',
-              prefixIcon: Icon(Icons.storage),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _portController,
+              decoration: const InputDecoration(
+                labelText: '端口',
+                hintText: '默认: 27017',
+                prefixIcon: Icon(Icons.settings_ethernet),
+              ),
+              keyboardType: TextInputType.number,
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return '请输入端口号';
+                }
+                final port = int.tryParse(value);
+                if (port == null || port <= 0 || port > 65535) {
+                  return '请输入有效的端口号 (1-65535)';
+                }
+                return null;
+              },
             ),
-          ),
-          const SizedBox(height: 24),
-          if (_testResult != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: Text(
-                _testResult!,
-                style: TextStyle(
-                  color: _testResult!.contains('成功')
-                      ? Colors.green
-                      : Colors.red,
-                  fontWeight: FontWeight.bold,
+            const SizedBox(height: 16),
+            SwitchListTile(
+              title: const Text('启用身份验证'),
+              value: _isAuthEnabled,
+              onChanged: (value) {
+                setState(() {
+                  _isAuthEnabled = value;
+                });
+              },
+            ),
+            if (_isAuthEnabled) ...[
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _usernameController,
+                decoration: const InputDecoration(
+                  labelText: '用户名',
+                  prefixIcon: Icon(Icons.person),
                 ),
+                validator: (value) {
+                  if (_isAuthEnabled && (value == null || value.isEmpty)) {
+                    return '请输入用户名';
+                  }
+                  return null;
+                },
               ),
-            ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              ElevatedButton.icon(
-                onPressed: _isTesting ? null : _testConnection,
-                icon: _isTesting
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.check_circle),
-                label: const Text('测试连接'),
-              ),
-              ElevatedButton.icon(
-                onPressed: _saveConnection,
-                icon: const Icon(Icons.save),
-                label: Text(widget.initialConnection != null ? '更新' : '保存'),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _passwordController,
+                decoration: const InputDecoration(
+                  labelText: '密码',
+                  prefixIcon: Icon(Icons.lock),
+                ),
+                obscureText: true,
+                validator: (value) {
+                  if (_isAuthEnabled && (value == null || value.isEmpty)) {
+                    return '请输入密码';
+                  }
+                  return null;
+                },
               ),
             ],
-          ),
-        ],
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _databaseController,
+              decoration: const InputDecoration(
+                labelText: '数据库名称 (可选)',
+                hintText: '留空以列出所有数据库',
+                prefixIcon: Icon(Icons.storage),
+              ),
+            ),
+            const SizedBox(height: 24),
+            if (_testResult != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Text(
+                  _testResult!,
+                  style: TextStyle(
+                    color: _testResult!.contains('成功')
+                        ? Colors.green
+                        : Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: _isTesting ? null : _testConnection,
+                  icon: _isTesting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.check_circle),
+                  label: const Text('测试连接'),
+                ),
+                ElevatedButton.icon(
+                  onPressed: _saveConnection,
+                  icon: const Icon(Icons.save),
+                  label: Text(widget.initialConnection != null ? '更新' : '保存'),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
