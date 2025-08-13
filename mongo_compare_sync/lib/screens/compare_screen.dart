@@ -5,7 +5,7 @@ import '../models/connection.dart';
 import '../models/collection.dart';
 import '../models/document.dart';
 import '../models/compare_rule.dart';
-import '../providers/connection_provider.dart';
+import '../providers/connection_provider.dart' hide ConnectionState;
 import '../providers/rule_provider.dart';
 import '../widgets/database_browser.dart';
 import '../widgets/responsive_layout.dart';
@@ -67,6 +67,25 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
         }
       }
     });
+  }
+
+  // 检查连接是否存在
+  Future<bool> _checkConnectionExists(String connectionId) async {
+    try {
+      final connectionsState = ref.read(connectionsProvider);
+      bool exists = false;
+
+      connectionsState.whenData((connections) {
+        exists = connections.any(
+          (conn) => conn.id == connectionId && conn.isConnected,
+        );
+      });
+
+      return exists;
+    } catch (e) {
+      LogService.instance.error('检查连接是否存在失败', e);
+      return false;
+    }
   }
 
   void _handleSourceConnectionChanged(MongoConnection? connection) {
@@ -347,7 +366,12 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                   const SizedBox(height: 24),
                   ElevatedButton.icon(
                     onPressed: () {
-                      Navigator.of(context).pop();
+                      // 使用 Navigator.of(context).pushReplacementNamed 替换当前路由，
+                      // 而不是简单地 pop 当前界面
+                      Navigator.of(context).pushNamedAndRemoveUntil(
+                        '/', // 主页路由
+                        (route) => false, // 移除所有路由
+                      );
                     },
                     icon: const Icon(Icons.link),
                     label: const Text('前往连接管理'),
@@ -505,12 +529,51 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                       height: 200,
                       child: _sourceConnection == null
                           ? const Center(child: Text('请选择源数据库连接'))
-                          : DatabaseBrowser(
-                              connection: _sourceConnection!,
-                              onCollectionSelected:
-                                  _handleSourceCollectionSelected,
-                              selectedDatabase: _sourceDatabase,
-                              selectedCollection: _sourceCollection,
+                          : FutureBuilder<bool>(
+                              future: _checkConnectionExists(
+                                _sourceConnection!.id,
+                              ),
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState ==
+                                    ConnectionState.waiting) {
+                                  return const Center(
+                                    child: CircularProgressIndicator(),
+                                  );
+                                }
+
+                                if (snapshot.hasError ||
+                                    snapshot.data == false) {
+                                  return Center(
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          '连接不可用，请重新选择连接',
+                                          style: TextStyle(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.error,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        ElevatedButton(
+                                          onPressed: _loadConnections,
+                                          child: const Text('刷新连接'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }
+
+                                return DatabaseBrowser(
+                                  connection: _sourceConnection!,
+                                  onCollectionSelected:
+                                      _handleSourceCollectionSelected,
+                                  selectedDatabase: _sourceDatabase,
+                                  selectedCollection: _sourceCollection,
+                                );
+                              },
                             ),
                     ),
                   ],
@@ -567,12 +630,51 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                       height: 200,
                       child: _targetConnection == null
                           ? const Center(child: Text('请选择目标数据库连接'))
-                          : DatabaseBrowser(
-                              connection: _targetConnection!,
-                              onCollectionSelected:
-                                  _handleTargetCollectionSelected,
-                              selectedDatabase: _targetDatabase,
-                              selectedCollection: _targetCollection,
+                          : FutureBuilder<bool>(
+                              future: _checkConnectionExists(
+                                _targetConnection!.id,
+                              ),
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState ==
+                                    ConnectionState.waiting) {
+                                  return const Center(
+                                    child: CircularProgressIndicator(),
+                                  );
+                                }
+
+                                if (snapshot.hasError ||
+                                    snapshot.data == false) {
+                                  return Center(
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          '连接不可用，请重新选择连接',
+                                          style: TextStyle(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.error,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        ElevatedButton(
+                                          onPressed: _loadConnections,
+                                          child: const Text('刷新连接'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }
+
+                                return DatabaseBrowser(
+                                  connection: _targetConnection!,
+                                  onCollectionSelected:
+                                      _handleTargetCollectionSelected,
+                                  selectedDatabase: _targetDatabase,
+                                  selectedCollection: _targetCollection,
+                                );
+                              },
                             ),
                     ),
                   ],
@@ -817,12 +919,51 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                           Expanded(
                             child: _sourceConnection == null
                                 ? const Center(child: Text('请选择源数据库连接'))
-                                : DatabaseBrowser(
-                                    connection: _sourceConnection!,
-                                    onCollectionSelected:
-                                        _handleSourceCollectionSelected,
-                                    selectedDatabase: _sourceDatabase,
-                                    selectedCollection: _sourceCollection,
+                                : FutureBuilder<bool>(
+                                    future: _checkConnectionExists(
+                                      _sourceConnection!.id,
+                                    ),
+                                    builder: (context, snapshot) {
+                                      if (snapshot.connectionState ==
+                                          ConnectionState.waiting) {
+                                        return const Center(
+                                          child: CircularProgressIndicator(),
+                                        );
+                                      }
+
+                                      if (snapshot.hasError ||
+                                          snapshot.data == false) {
+                                        return Center(
+                                          child: Column(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Text(
+                                                '连接不可用，请重新选择连接',
+                                                style: TextStyle(
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).colorScheme.error,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 8),
+                                              ElevatedButton(
+                                                onPressed: _loadConnections,
+                                                child: const Text('刷新连接'),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      }
+
+                                      return DatabaseBrowser(
+                                        connection: _sourceConnection!,
+                                        onCollectionSelected:
+                                            _handleSourceCollectionSelected,
+                                        selectedDatabase: _sourceDatabase,
+                                        selectedCollection: _sourceCollection,
+                                      );
+                                    },
                                   ),
                           ),
                         ],
@@ -873,12 +1014,51 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                           Expanded(
                             child: _targetConnection == null
                                 ? const Center(child: Text('请选择目标数据库连接'))
-                                : DatabaseBrowser(
-                                    connection: _targetConnection!,
-                                    onCollectionSelected:
-                                        _handleTargetCollectionSelected,
-                                    selectedDatabase: _targetDatabase,
-                                    selectedCollection: _targetCollection,
+                                : FutureBuilder<bool>(
+                                    future: _checkConnectionExists(
+                                      _targetConnection!.id,
+                                    ),
+                                    builder: (context, snapshot) {
+                                      if (snapshot.connectionState ==
+                                          ConnectionState.waiting) {
+                                        return const Center(
+                                          child: CircularProgressIndicator(),
+                                        );
+                                      }
+
+                                      if (snapshot.hasError ||
+                                          snapshot.data == false) {
+                                        return Center(
+                                          child: Column(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Text(
+                                                '连接不可用，请重新选择连接',
+                                                style: TextStyle(
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).colorScheme.error,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 8),
+                                              ElevatedButton(
+                                                onPressed: _loadConnections,
+                                                child: const Text('刷新连接'),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      }
+
+                                      return DatabaseBrowser(
+                                        connection: _targetConnection!,
+                                        onCollectionSelected:
+                                            _handleTargetCollectionSelected,
+                                        selectedDatabase: _targetDatabase,
+                                        selectedCollection: _targetCollection,
+                                      );
+                                    },
                                   ),
                           ),
                         ],
@@ -1022,29 +1202,44 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
     List<MongoConnection> connections,
     Function(MongoConnection?) onChanged,
   ) {
+    // 确保连接ID唯一性
+    final uniqueConnections = <String, MongoConnection>{};
+    for (final conn in connections) {
+      uniqueConnections[conn.id] = conn;
+    }
+    final uniqueConnectionsList = uniqueConnections.values.toList();
+
+    // 检查当前选中的连接是否存在于唯一连接列表中
+    final selectedConnectionExists = selectedConnection == null
+        ? false
+        : uniqueConnections.containsKey(selectedConnection.id);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
-        DropdownButtonFormField<String>(
-          value: selectedConnection?.id,
+        DropdownButtonFormField<String?>(
+          value: selectedConnectionExists ? selectedConnection?.id : null,
           decoration: InputDecoration(
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             contentPadding: const EdgeInsets.symmetric(horizontal: 16),
           ),
-          items: connections.map((conn) {
-            return DropdownMenuItem<String>(
+          items: uniqueConnectionsList.map((conn) {
+            return DropdownMenuItem<String?>(
               value: conn.id,
               child: Text(conn.name),
             );
           }).toList(),
           onChanged: (value) {
             if (value != null) {
-              final connection = connections.firstWhere(
+              final connection = uniqueConnectionsList.firstWhere(
                 (conn) => conn.id == value,
+                orElse: () => uniqueConnectionsList.first,
               );
               onChanged(connection);
+            } else {
+              onChanged(null);
             }
           },
         ),
@@ -1055,17 +1250,29 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
   Widget _buildRuleSelector() {
     final rules = ref.watch(rulesProvider);
 
-    return DropdownButtonFormField<String>(
-      value: _selectedRule?.id,
+    // 确保规则ID唯一性
+    final uniqueRules = <String, CompareRule>{};
+    for (final rule in rules) {
+      uniqueRules[rule.id] = rule;
+    }
+    final uniqueRulesList = uniqueRules.values.toList();
+
+    // 检查当前选中的规则是否存在于唯一规则列表中
+    final selectedRuleExists = _selectedRule == null
+        ? false
+        : uniqueRules.containsKey(_selectedRule!.id);
+
+    return DropdownButtonFormField<String?>(
+      value: selectedRuleExists ? _selectedRule?.id : null,
       decoration: InputDecoration(
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16),
         hintText: '选择比较规则（可选）',
       ),
       items: [
-        const DropdownMenuItem<String>(value: '', child: Text('不使用规则')),
-        ...rules.map((rule) {
-          return DropdownMenuItem<String>(
+        const DropdownMenuItem<String?>(value: null, child: Text('不使用规则')),
+        ...uniqueRulesList.map((rule) {
+          return DropdownMenuItem<String?>(
             value: rule.id,
             child: Text(rule.name),
           );
@@ -1073,10 +1280,13 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
       ],
       onChanged: (value) {
         setState(() {
-          if (value == null || value.isEmpty) {
+          if (value == null) {
             _selectedRule = null;
           } else {
-            _selectedRule = rules.firstWhere((rule) => rule.id == value);
+            _selectedRule = uniqueRulesList.firstWhere(
+              (rule) => rule.id == value,
+              orElse: () => uniqueRulesList.first,
+            );
           }
         });
       },

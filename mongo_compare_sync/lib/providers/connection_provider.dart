@@ -72,27 +72,41 @@ class ConnectionsNotifier
   // 添加新连接
   Future<void> addConnection(MongoConnection connection) async {
     try {
-      await _repository.saveConnection(connection);
-      state.whenData((connections) {
-        state = AsyncValue.data([...connections, connection]);
+      final savedConnection = await _repository.saveConnection(connection);
+      // 使用 Future.microtask 确保在 widget 构建完成后更新状态
+      await Future.microtask(() {
+        if (mounted) {
+          state.whenData((connections) {
+            state = AsyncValue.data([...connections, savedConnection]);
+          });
+        }
       });
     } catch (error, stackTrace) {
-      state = AsyncValue.error(error, stackTrace);
+      if (mounted) {
+        state = AsyncValue.error(error, stackTrace);
+      }
     }
   }
 
   // 更新连接
   Future<void> updateConnection(MongoConnection connection) async {
     try {
-      await _repository.saveConnection(connection);
-      state.whenData((connections) {
-        state = AsyncValue.data([
-          for (final conn in connections)
-            if (conn.id == connection.id) connection else conn,
-        ]);
+      final savedConnection = await _repository.saveConnection(connection);
+      // 使用 Future.microtask 确保在 widget 构建完成后更新状态
+      await Future.microtask(() {
+        if (mounted) {
+          state.whenData((connections) {
+            state = AsyncValue.data([
+              for (final conn in connections)
+                if (conn.id == savedConnection.id) savedConnection else conn,
+            ]);
+          });
+        }
       });
     } catch (error, stackTrace) {
-      state = AsyncValue.error(error, stackTrace);
+      if (mounted) {
+        state = AsyncValue.error(error, stackTrace);
+      }
     }
   }
 

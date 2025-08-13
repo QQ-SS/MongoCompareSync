@@ -89,17 +89,56 @@ class _ConnectionFormState extends ConsumerState<ConnectionForm> {
       return;
     }
 
-    final connection = _buildConnection();
-    final notifier = ref.read(connectionsProvider.notifier);
+    try {
+      final connection = _buildConnection();
+      final notifier = ref.read(connectionsProvider.notifier);
 
-    if (widget.initialConnection != null) {
-      await notifier.updateConnection(connection);
-    } else {
-      await notifier.addConnection(connection);
-    }
+      // 显示保存中的加载指示器
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('保存中...'),
+            ],
+          ),
+        ),
+      );
 
-    if (mounted) {
-      Navigator.of(context).pop();
+      // 保存连接
+      if (widget.initialConnection != null) {
+        await notifier.updateConnection(connection);
+      } else {
+        await notifier.addConnection(connection);
+      }
+
+      // 关闭加载对话框
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+
+      // 延迟一下再返回上一页，确保状态已更新
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      // 返回上一页
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      // 关闭加载对话框
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+
+      // 显示错误信息
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('保存失败: ${e.toString()}')));
+      }
     }
   }
 
