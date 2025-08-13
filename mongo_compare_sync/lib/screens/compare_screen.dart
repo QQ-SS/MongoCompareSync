@@ -5,6 +5,7 @@ import '../models/collection.dart';
 import '../models/document.dart';
 import '../providers/connection_provider.dart';
 import '../widgets/database_browser.dart';
+import 'comparison_result_screen.dart';
 
 class CompareScreen extends ConsumerStatefulWidget {
   const CompareScreen({super.key});
@@ -110,6 +111,24 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
         _comparisonResults = results;
         _isComparing = false;
       });
+
+      // 导航到比较结果界面
+      if (results.isNotEmpty) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => ComparisonResultScreen(
+              results: results,
+              sourceCollection: '$_sourceDatabase.$_sourceCollection',
+              targetCollection: '$_targetDatabase.$_targetCollection',
+            ),
+          ),
+        );
+      } else {
+        // 如果没有差异，显示提示
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('没有发现差异')));
+      }
     } catch (e) {
       setState(() {
         _error = '比较失败: ${e.toString()}';
@@ -285,21 +304,13 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
             ),
           ),
 
-          // 比较结果区域（暂时只显示简单的结果信息）
+          // 比较结果区域
           if (_error != null)
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Text(
                 _error!,
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
-            )
-          else if (_comparisonResults != null)
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(
-                '比较完成: 发现 ${_comparisonResults!.length} 个差异',
-                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
         ],
