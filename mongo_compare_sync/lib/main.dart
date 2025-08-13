@@ -7,6 +7,7 @@ import 'models/hive_adapters.dart';
 import 'repositories/compare_rule_repository.dart';
 import 'repositories/connection_repository.dart';
 import 'services/mongo_service.dart';
+import 'providers/settings_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,11 +29,14 @@ void main() async {
   runApp(const ProviderScope(child: MongoCompareSyncApp()));
 }
 
-class MongoCompareSyncApp extends StatelessWidget {
+class MongoCompareSyncApp extends ConsumerWidget {
   const MongoCompareSyncApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // 监听主题模式设置
+    final themeMode = ref.watch(themeModeProvider);
+
     return MaterialApp(
       title: 'MongoDB比较同步工具',
       theme: ThemeData(
@@ -52,7 +56,7 @@ class MongoCompareSyncApp extends StatelessWidget {
         useMaterial3: true,
         fontFamily: 'Roboto',
       ),
-      themeMode: ThemeMode.system, // 跟随系统主题
+      themeMode: themeMode, // 使用设置中的主题模式
       home: const HomeScreen(),
     );
   }

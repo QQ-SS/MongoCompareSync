@@ -25,7 +25,8 @@
     "flutter_riverpod",
     "freezed",
     "hive",
-    "file_picker"
+    "file_picker",
+    "shared_preferences"
   ],
   "platforms": [
     "MacOS",
@@ -69,9 +70,9 @@ Note:
 
 [X] 实现规则保存和加载功能
 
-[/] 添加连接配置的本地存储功能
+[X] 添加连接配置的本地存储功能
 
-[ ] 实现应用设置和首选项功能
+[X] 实现应用设置和首选项功能
 
 [ ] 添加错误处理和日志记录
 
