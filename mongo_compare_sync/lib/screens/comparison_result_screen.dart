@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/document.dart';
+import '../models/sync_result.dart';
 import '../widgets/diff_item.dart';
+import '../providers/connection_provider.dart';
 
-class ComparisonResultScreen extends StatefulWidget {
+class ComparisonResultScreen extends ConsumerStatefulWidget {
   final List<DocumentDiff> results;
   final String sourceCollection;
   final String targetCollection;
@@ -15,10 +18,12 @@ class ComparisonResultScreen extends StatefulWidget {
   });
 
   @override
-  State<ComparisonResultScreen> createState() => _ComparisonResultScreenState();
+  ConsumerState<ComparisonResultScreen> createState() =>
+      _ComparisonResultScreenState();
 }
 
-class _ComparisonResultScreenState extends State<ComparisonResultScreen> {
+class _ComparisonResultScreenState
+    extends ConsumerState<ComparisonResultScreen> {
   // 存储展开状态的Map
   final Map<String, bool> _expandedItems = {};
   // 过滤选项
@@ -29,6 +34,13 @@ class _ComparisonResultScreenState extends State<ComparisonResultScreen> {
   String _searchQuery = '';
   // 排序方式
   String _sortBy = 'path'; // 'path', 'type'
+
+  // 同步方向
+  bool _sourceToTarget = true;
+
+  // 同步状态
+  bool _isSyncing = false;
+  SyncResult? _syncResult;
 
   @override
   Widget build(BuildContext context) {
@@ -54,16 +66,21 @@ class _ComparisonResultScreenState extends State<ComparisonResultScreen> {
               ).showSnackBar(const SnackBar(content: Text('导出功能尚未实现')));
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.sync),
-            tooltip: '同步数据',
-            onPressed: () {
-              // TODO: 实现同步功能
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('同步功能尚未实现')));
-            },
-          ),
+          _isSyncing
+              ? const IconButton(
+                  icon: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  tooltip: '正在同步...',
+                  onPressed: null,
+                )
+              : IconButton(
+                  icon: const Icon(Icons.sync),
+                  tooltip: '同步数据',
+                  onPressed: _showSyncDialog,
+                ),
         ],
       ),
       body: Column(
@@ -314,5 +331,211 @@ class _ComparisonResultScreenState extends State<ComparisonResultScreen> {
     }
 
     return filtered;
+  }
+
+  // 显示同步对话框
+  void _showSyncDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('同步数据'),
+        content: StatefulBuilder(
+          builder: (context, setState) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('请选择同步方向:'),
+                const SizedBox(height: 8),
+
+                // 同步方向选择
+                RadioListTile<bool>(
+                  title: Text(
+                    '从源到目标 (${widget.sourceCollection} → ${widget.targetCollection})',
+                  ),
+                  value: true,
+                  groupValue: _sourceToTarget,
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        _sourceToTarget = value;
+                      });
+                    }
+                  },
+                ),
+                RadioListTile<bool>(
+                  title: Text(
+                    '从目标到源 (${widget.targetCollection} → ${widget.sourceCollection})',
+                  ),
+                  value: false,
+                  groupValue: _sourceToTarget,
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        _sourceToTarget = value;
+                      });
+                    }
+                  },
+                ),
+
+                const SizedBox(height: 16),
+                const Text('请选择要同步的差异类型:'),
+                const SizedBox(height: 8),
+
+                // 差异类型选择
+                CheckboxListTile(
+                  title: const Text('新增文档'),
+                  value: _showAdded,
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        _showAdded = value;
+                      });
+                    }
+                  },
+                ),
+                CheckboxListTile(
+                  title: const Text('删除文档'),
+                  value: _showRemoved,
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        _showRemoved = value;
+                      });
+                    }
+                  },
+                ),
+                CheckboxListTile(
+                  title: const Text('修改文档'),
+                  value: _showModified,
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        _showModified = value;
+                      });
+                    }
+                  },
+                ),
+              ],
+            );
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _syncData();
+            },
+            child: const Text('同步'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 执行同步操作
+  Future<void> _syncData() async {
+    // 获取要同步的差异类型
+    final List<String> diffTypes = [];
+    if (_showAdded) diffTypes.add('added');
+    if (_showRemoved) diffTypes.add('removed');
+    if (_showModified) diffTypes.add('modified');
+
+    if (diffTypes.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请至少选择一种差异类型进行同步')));
+      return;
+    }
+
+    setState(() {
+      _isSyncing = true;
+      _syncResult = null;
+    });
+
+    try {
+      // 执行同步操作
+      final mongoService = ref.read(mongoServiceProvider);
+      final result = await mongoService.syncDocumentDiffs(
+        widget.results,
+        _sourceToTarget,
+        diffTypes: diffTypes,
+      );
+
+      setState(() {
+        _syncResult = result;
+        _isSyncing = false;
+      });
+
+      // 显示同步结果
+      _showSyncResultDialog(result);
+    } catch (e) {
+      setState(() {
+        _isSyncing = false;
+      });
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('同步失败: ${e.toString()}')));
+    }
+  }
+
+  // 显示同步结果对话框
+  void _showSyncResultDialog(SyncResult result) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('同步结果'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(result.summary),
+            if (result.hasErrors) ...[
+              const SizedBox(height: 16),
+              const Text(
+                '错误详情:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                height: 200,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: ListView.builder(
+                  itemCount: result.errors.length,
+                  itemBuilder: (context, index) {
+                    return Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Text(
+                        result.errors[index],
+                        style: TextStyle(color: Colors.red.shade700),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
+    );
   }
 }

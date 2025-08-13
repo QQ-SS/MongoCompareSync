@@ -3,6 +3,7 @@ import 'package:mongo_dart/mongo_dart.dart';
 import '../models/connection.dart';
 import '../models/collection.dart';
 import '../models/document.dart';
+import '../models/sync_result.dart';
 
 class MongoService {
   // 存储活跃的数据库连接
@@ -578,5 +579,152 @@ class MongoService {
           break;
       }
     }
+  }
+
+  // 批量同步文档差异
+  Future<SyncResult> syncDocumentDiffs(
+    List<DocumentDiff> diffs,
+    bool sourceToTarget, {
+    List<String>? diffTypes,
+  }) async {
+    int successCount = 0;
+    int failureCount = 0;
+    List<String> errors = [];
+
+    // 过滤要同步的差异类型
+    List<DocumentDiff> filteredDiffs = diffs;
+    if (diffTypes != null && diffTypes.isNotEmpty) {
+      filteredDiffs = diffs
+          .where((diff) => diffTypes.contains(diff.status))
+          .toList();
+    }
+
+    // 批量同步
+    for (var diff in filteredDiffs) {
+      try {
+        await syncDocumentDiff(diff, sourceToTarget);
+        successCount++;
+      } catch (e) {
+        failureCount++;
+        errors.add('同步文档 ${diff.sourceDocument.id} 失败: ${e.toString()}');
+      }
+    }
+
+    return SyncResult(
+      totalCount: filteredDiffs.length,
+      successCount: successCount,
+      failureCount: failureCount,
+      errors: errors,
+    );
+  }
+
+  // 同步字段差异
+  Future<void> syncFieldDiff(
+    FieldDiff fieldDiff,
+    DocumentDiff docDiff,
+    bool sourceToTarget,
+  ) async {
+    if (docDiff.diffType != DocumentDiffType.modified ||
+        docDiff.targetDocument == null) {
+      throw Exception('只能同步已修改的文档的字段差异');
+    }
+
+    // 获取目标文档
+    final targetDoc = docDiff.targetDocument!;
+
+    // 创建更新操作
+    final Map<String, dynamic> updateData = {};
+
+    if (sourceToTarget) {
+      // 从源到目标的同步
+      switch (fieldDiff.status) {
+        case 'added':
+          // 在目标中添加字段
+          _setNestedField(
+            updateData,
+            fieldDiff.fieldPath,
+            fieldDiff.sourceValue,
+          );
+          break;
+        case 'removed':
+          // 从目标中删除字段
+          _setNestedField(updateData, fieldDiff.fieldPath, null);
+          break;
+        case 'modified':
+          // 更新目标中的字段
+          _setNestedField(
+            updateData,
+            fieldDiff.fieldPath,
+            fieldDiff.sourceValue,
+          );
+          break;
+      }
+
+      // 执行更新
+      await updateDocument(
+        targetDoc.connectionId,
+        targetDoc.databaseName,
+        targetDoc.collectionName,
+        ObjectId.parse(targetDoc.id),
+        updateData,
+      );
+    } else {
+      // 从目标到源的同步
+      switch (fieldDiff.status) {
+        case 'added':
+          // 在源中删除字段
+          _setNestedField(updateData, fieldDiff.fieldPath, null);
+          break;
+        case 'removed':
+          // 在源中添加字段
+          _setNestedField(
+            updateData,
+            fieldDiff.fieldPath,
+            fieldDiff.targetValue,
+          );
+          break;
+        case 'modified':
+          // 更新源中的字段
+          _setNestedField(
+            updateData,
+            fieldDiff.fieldPath,
+            fieldDiff.targetValue,
+          );
+          break;
+      }
+
+      // 执行更新
+      await updateDocument(
+        docDiff.sourceDocument.connectionId,
+        docDiff.sourceDocument.databaseName,
+        docDiff.sourceDocument.collectionName,
+        ObjectId.parse(docDiff.sourceDocument.id),
+        updateData,
+      );
+    }
+  }
+
+  // 设置嵌套字段的值
+  void _setNestedField(Map<String, dynamic> data, String path, dynamic value) {
+    final parts = path.split('.');
+
+    if (parts.length == 1) {
+      // 简单字段
+      data[parts[0]] = value;
+      return;
+    }
+
+    // 嵌套字段
+    Map<String, dynamic> current = data;
+    for (int i = 0; i < parts.length - 1; i++) {
+      final part = parts[i];
+      if (!current.containsKey(part)) {
+        current[part] = <String, dynamic>{};
+      }
+      current = current[part] as Map<String, dynamic>;
+    }
+
+    // 设置最终字段的值
+    current[parts.last] = value;
   }
 }
