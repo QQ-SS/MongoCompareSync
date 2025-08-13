@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -7,26 +8,51 @@ import 'models/hive_adapters.dart';
 import 'repositories/compare_rule_repository.dart';
 import 'repositories/connection_repository.dart';
 import 'services/mongo_service.dart';
+import 'services/log_service.dart';
+import 'services/error_service.dart';
 import 'providers/settings_provider.dart';
 
 void main() async {
+  // 确保Flutter绑定初始化
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 初始化Hive
-  final appDocumentDir = await getApplicationDocumentsDirectory();
-  await Hive.initFlutter(appDocumentDir.path);
+  // 初始化错误捕获
+  final errorService = ErrorService();
+  errorService.initErrorCapture();
 
-  // 注册Hive适配器
-  registerHiveAdapters();
+  // 使用runZonedGuarded捕获未处理的异步错误
+  runZonedGuarded(
+    () async {
+      try {
+        // 初始化Hive
+        final appDocumentDir = await getApplicationDocumentsDirectory();
+        await Hive.initFlutter(appDocumentDir.path);
 
-  // 初始化规则存储库
-  await CompareRuleRepository().init();
+        // 注册Hive适配器
+        registerHiveAdapters();
 
-  // 初始化连接存储库
-  final mongoService = MongoService();
-  await ConnectionRepository(mongoService: mongoService).init();
+        // 初始化规则存储库
+        await CompareRuleRepository().init();
 
-  runApp(const ProviderScope(child: MongoCompareSyncApp()));
+        // 初始化连接存储库
+        final mongoService = MongoService();
+        await ConnectionRepository(mongoService: mongoService).init();
+
+        // 运行应用
+        runApp(const ProviderScope(child: MongoCompareSyncApp()));
+      } catch (e, stackTrace) {
+        // 记录启动错误
+        final logService = LogService();
+        logService.fatal('应用启动失败', e, stackTrace);
+        rethrow; // 重新抛出异常，让Flutter显示错误屏幕
+      }
+    },
+    (error, stackTrace) {
+      // 处理未捕获的异步错误
+      final logService = LogService();
+      logService.fatal('未捕获的异步错误', error, stackTrace);
+    },
+  );
 }
 
 class MongoCompareSyncApp extends ConsumerWidget {

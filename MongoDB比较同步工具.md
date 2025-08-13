@@ -26,7 +26,8 @@
     "freezed",
     "hive",
     "file_picker",
-    "shared_preferences"
+    "shared_preferences",
+    "logger"
   ],
   "platforms": [
     "MacOS",
@@ -74,7 +75,7 @@ Note:
 
 [X] 实现应用设置和首选项功能
 
-[ ] 添加错误处理和日志记录
+[X] 添加错误处理和日志记录
 
 [ ] 优化UI响应性和平台特定适配
 
