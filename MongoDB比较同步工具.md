@@ -13,6 +13,10 @@
 ## Tech Stack
 
 {
+  "Web": {
+    "arch": null,
+    "component": null
+  },
   "framework": "Flutter",
   "language": "Dart",
   "dependencies": [
@@ -54,9 +58,9 @@ Note:
 
 [X] 实现数据库结构浏览器(显示数据库和集合)
 
-[/] 开发文档比较算法，支持自定义忽略字段
+[X] 开发文档比较算法，支持自定义忽略字段
 
-[ ] 创建比较结果可视化界面
+[/] 创建比较结果可视化界面
 
 [ ] 实现数据同步操作功能(增删改查)
 

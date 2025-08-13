@@ -321,58 +321,175 @@ class MongoService {
   ) {
     final Map<String, dynamic> diffs = {};
 
-    // 比较源文档中的字段
-    for (var key in sourceDoc.keys) {
-      // 跳过被忽略的字段
-      if (ignoreFields != null && ignoreFields.contains(key)) {
-        continue;
-      }
-
-      // 跳过_id字段
-      if (key == '_id') {
-        continue;
-      }
-
-      if (!targetDoc.containsKey(key)) {
-        // 字段只在源文档中存在
-        diffs[key] = {
-          'source': sourceDoc[key],
-          'target': null,
-          'status': 'removed',
-        };
-      } else if (sourceDoc[key] != targetDoc[key]) {
-        // 字段值不同
-        diffs[key] = {
-          'source': sourceDoc[key],
-          'target': targetDoc[key],
-          'status': 'modified',
-        };
+    // 将忽略字段列表转换为正则表达式列表，以支持通配符匹配
+    final List<RegExp> ignoreRegexps = [];
+    if (ignoreFields != null) {
+      for (var field in ignoreFields) {
+        // 将通配符转换为正则表达式
+        final pattern = field
+            .replaceAll('.', '\\.') // 转义点号
+            .replaceAll('*', '.*') // 将*转换为正则表达式的.*
+            .replaceAll('?', '.'); // 将?转换为正则表达式的.
+        ignoreRegexps.add(RegExp('^$pattern\$'));
       }
     }
 
-    // 检查只在目标文档中存在的字段
-    for (var key in targetDoc.keys) {
-      // 跳过被忽略的字段
-      if (ignoreFields != null && ignoreFields.contains(key)) {
-        continue;
+    // 递归比较函数，支持嵌套对象
+    void _compareNestedDocuments(
+      Map<String, dynamic> source,
+      Map<String, dynamic> target,
+      String path,
+      Map<String, dynamic> result,
+    ) {
+      // 比较源文档中的字段
+      for (var key in source.keys) {
+        final currentPath = path.isEmpty ? key : '$path.$key';
+
+        // 跳过_id字段
+        if (key == '_id') {
+          continue;
+        }
+
+        // 检查是否应该忽略此字段
+        bool shouldIgnore = false;
+        for (var regex in ignoreRegexps) {
+          if (regex.hasMatch(currentPath)) {
+            shouldIgnore = true;
+            break;
+          }
+        }
+        if (shouldIgnore) {
+          continue;
+        }
+
+        if (!target.containsKey(key)) {
+          // 字段只在源文档中存在
+          result[currentPath] = {
+            'source': source[key],
+            'target': null,
+            'status': 'removed',
+            'path': currentPath,
+          };
+        } else {
+          final sourceValue = source[key];
+          final targetValue = target[key];
+
+          if (sourceValue is Map<String, dynamic> &&
+              targetValue is Map<String, dynamic>) {
+            // 递归比较嵌套对象
+            _compareNestedDocuments(
+              sourceValue,
+              targetValue,
+              currentPath,
+              result,
+            );
+          } else if (sourceValue is List && targetValue is List) {
+            // 比较数组
+            if (!_areListsEqual(sourceValue, targetValue)) {
+              result[currentPath] = {
+                'source': sourceValue,
+                'target': targetValue,
+                'status': 'modified',
+                'path': currentPath,
+              };
+            }
+          } else if (sourceValue != targetValue) {
+            // 字段值不同
+            result[currentPath] = {
+              'source': sourceValue,
+              'target': targetValue,
+              'status': 'modified',
+              'path': currentPath,
+            };
+          }
+        }
       }
 
-      // 跳过_id字段
-      if (key == '_id') {
-        continue;
-      }
+      // 检查只在目标文档中存在的字段
+      for (var key in target.keys) {
+        final currentPath = path.isEmpty ? key : '$path.$key';
 
-      if (!sourceDoc.containsKey(key)) {
-        // 字段只在目标文档中存在
-        diffs[key] = {
-          'source': null,
-          'target': targetDoc[key],
-          'status': 'added',
-        };
+        // 跳过_id字段
+        if (key == '_id') {
+          continue;
+        }
+
+        // 检查是否应该忽略此字段
+        bool shouldIgnore = false;
+        for (var regex in ignoreRegexps) {
+          if (regex.hasMatch(currentPath)) {
+            shouldIgnore = true;
+            break;
+          }
+        }
+        if (shouldIgnore) {
+          continue;
+        }
+
+        if (!source.containsKey(key)) {
+          // 字段只在目标文档中存在
+          result[currentPath] = {
+            'source': null,
+            'target': target[key],
+            'status': 'added',
+            'path': currentPath,
+          };
+        }
       }
     }
+
+    // 开始递归比较
+    _compareNestedDocuments(sourceDoc, targetDoc, '', diffs);
 
     return diffs;
+  }
+
+  // 比较两个列表是否相等
+  bool _areListsEqual(List sourceList, List targetList) {
+    if (sourceList.length != targetList.length) {
+      return false;
+    }
+
+    // 如果列表中的元素是简单类型，可以直接排序后比较
+    if (sourceList.isEmpty ||
+        (sourceList.first is num ||
+            sourceList.first is String ||
+            sourceList.first is bool)) {
+      try {
+        final sortedSource = List.from(sourceList)..sort();
+        final sortedTarget = List.from(targetList)..sort();
+
+        for (int i = 0; i < sortedSource.length; i++) {
+          if (sortedSource[i] != sortedTarget[i]) {
+            return false;
+          }
+        }
+        return true;
+      } catch (e) {
+        // 如果排序失败，回退到逐个比较
+        return false;
+      }
+    }
+
+    // 对于复杂类型（如Map），需要逐个比较
+    // 这里简化处理，认为顺序相同的情况下才相等
+    for (int i = 0; i < sourceList.length; i++) {
+      final sourceItem = sourceList[i];
+      final targetItem = targetList[i];
+
+      if (sourceItem is Map<String, dynamic> &&
+          targetItem is Map<String, dynamic>) {
+        // 递归比较Map
+        final diffs = _compareDocuments(sourceItem, targetItem, null);
+        if (diffs.isNotEmpty) {
+          return false;
+        }
+      } else if (sourceItem != targetItem) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   // 同步文档差异
