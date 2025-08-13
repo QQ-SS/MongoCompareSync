@@ -11,7 +11,7 @@
 - 自定义比较规则
 
 ## Tech Stack
-```
+
 {
   "framework": "Flutter",
   "language": "Dart",
@@ -27,7 +27,7 @@
     "Windows"
   ]
 }
-```
+
 ## Design
 
 Material Design风格的专业数据工具界面，分为连接管理、数据比较和同步操作三大功能区域
@@ -42,13 +42,13 @@ Note:
 
 ---
 
-[ ] 创建Flutter项目并配置平台支持(MacOS和Windows)
+[X] 创建Flutter项目并配置平台支持(MacOS和Windows)
 
-[ ] 添加必要的依赖项(mongo_dart, provider, riverpod, freezed等)
+[X] 添加必要的依赖项(mongo_dart, provider, riverpod, freezed等)
 
-[ ] 设计并实现数据模型(数据库连接、集合、文档、比较规则)
+[X] 设计并实现数据模型(数据库连接、集合、文档、比较规则)
 
-[ ] 实现MongoDB服务层，包括连接、查询和操作功能
+[/] 实现MongoDB服务层，包括连接、查询和操作功能
 
 [ ] 创建数据库连接管理界面和功能
 
