@@ -3,9 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/connection.dart';
 import '../models/collection.dart';
 import '../models/document.dart';
+import '../models/compare_rule.dart';
 import '../providers/connection_provider.dart';
+import '../providers/rule_provider.dart';
 import '../widgets/database_browser.dart';
 import 'comparison_result_screen.dart';
+import 'rule_list_screen.dart';
 
 class CompareScreen extends ConsumerStatefulWidget {
   const CompareScreen({super.key});
@@ -24,6 +27,7 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
   bool _isComparing = false;
   String? _error;
   List<DocumentDiff>? _comparisonResults;
+  CompareRule? _selectedRule;
 
   @override
   void initState() {
@@ -105,6 +109,7 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
         _targetConnection!.id,
         _targetDatabase!,
         _targetCollection!,
+        fieldRules: _selectedRule?.fieldRules,
       );
 
       setState(() {
@@ -279,6 +284,38 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
             ),
           ),
 
+          // 比较规则选择区域
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      '比较规则:',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(child: _buildRuleSelector()),
+                    const SizedBox(width: 16),
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const RuleListScreen(),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.rule),
+                      label: const Text('管理规则'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
           // 比较操作区域
           Padding(
             padding: const EdgeInsets.all(16.0),
@@ -351,6 +388,37 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
           },
         ),
       ],
+    );
+  }
+
+  Widget _buildRuleSelector() {
+    final rules = ref.watch(rulesProvider);
+
+    return DropdownButtonFormField<String>(
+      value: _selectedRule?.id,
+      decoration: InputDecoration(
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+        hintText: '选择比较规则（可选）',
+      ),
+      items: [
+        const DropdownMenuItem<String>(value: '', child: Text('不使用规则')),
+        ...rules.map((rule) {
+          return DropdownMenuItem<String>(
+            value: rule.id,
+            child: Text(rule.name),
+          );
+        }).toList(),
+      ],
+      onChanged: (value) {
+        setState(() {
+          if (value == null || value.isEmpty) {
+            _selectedRule = null;
+          } else {
+            _selectedRule = rules.firstWhere((rule) => rule.id == value);
+          }
+        });
+      },
     );
   }
 }

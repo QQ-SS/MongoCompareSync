@@ -4,22 +4,22 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'screens/home_screen.dart';
 import 'models/hive_adapters.dart';
+import 'repositories/compare_rule_repository.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // 初始化Hive
   final appDocumentDir = await getApplicationDocumentsDirectory();
   await Hive.initFlutter(appDocumentDir.path);
-  
+
   // 注册Hive适配器
   registerHiveAdapters();
-  
-  runApp(
-    const ProviderScope(
-      child: MongoCompareSyncApp(),
-    ),
-  );
+
+  // 初始化规则存储库
+  await CompareRuleRepository().init();
+
+  runApp(const ProviderScope(child: MongoCompareSyncApp()));
 }
 
 class MongoCompareSyncApp extends StatelessWidget {

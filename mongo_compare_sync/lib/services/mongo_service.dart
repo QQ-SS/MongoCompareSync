@@ -4,6 +4,7 @@ import '../models/connection.dart';
 import '../models/collection.dart';
 import '../models/document.dart';
 import '../models/sync_result.dart';
+import '../models/compare_rule.dart';
 
 class MongoService {
   // 存储活跃的数据库连接
@@ -241,6 +242,7 @@ class MongoService {
     String targetDatabaseName,
     String targetCollectionName, {
     List<String>? ignoreFields,
+    List<FieldRule>? fieldRules,
   }) async {
     // 获取源集合的所有文档
     final sourceDocuments = await getDocuments(
@@ -318,12 +320,15 @@ class MongoService {
   Map<String, dynamic> _compareDocuments(
     Map<String, dynamic> sourceDoc,
     Map<String, dynamic> targetDoc,
-    List<String>? ignoreFields,
-  ) {
+    List<String>? ignoreFields, {
+    List<FieldRule>? fieldRules,
+  }) {
     final Map<String, dynamic> diffs = {};
 
     // 将忽略字段列表转换为正则表达式列表，以支持通配符匹配
     final List<RegExp> ignoreRegexps = [];
+    
+    // 处理简单的忽略字段列表
     if (ignoreFields != null) {
       for (var field in ignoreFields) {
         // 将通配符转换为正则表达式
@@ -332,6 +337,31 @@ class MongoService {
             .replaceAll('*', '.*') // 将*转换为正则表达式的.*
             .replaceAll('?', '.'); // 将?转换为正则表达式的.
         ignoreRegexps.add(RegExp('^$pattern\$'));
+      }
+    }
+    
+    // 处理字段规则
+    if (fieldRules != null) {
+      for (var rule in fieldRules) {
+        if (rule.ruleType == RuleType.ignore) {
+          final pattern = rule.fieldPath
+              .replaceAll('.', '\\.') // 转义点号
+              .replaceAll('*', '.*') // 将*转换为正则表达式的.*
+              .replaceAll('?', '.'); // 将?转换为正则表达式的.
+          
+          // 如果规则本身就是正则表达式，则直接使用
+          if (rule.isRegex) {
+            try {
+              ignoreRegexps.add(RegExp(rule.fieldPath));
+            } catch (e) {
+              print('无效的正则表达式: ${rule.fieldPath}, 错误: $e');
+              // 回退到普通字符串匹配
+              ignoreRegexps.add(RegExp('^$pattern\$'));
+            }
+          } else {
+            ignoreRegexps.add(RegExp('^$pattern\$'));
+          }
+        }
       }
     }
 
