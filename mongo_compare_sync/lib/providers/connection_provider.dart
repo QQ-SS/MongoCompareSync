@@ -51,10 +51,16 @@ class ConnectionsNotifier
   Future<void> _loadConnections() async {
     try {
       state = const AsyncValue.loading();
-      final connections = _repository.getAllConnections();
-      state = AsyncValue.data(connections);
+      // 使用异步方法获取连接
+      final connections = await Future(() => _repository.getAllConnections());
+      // 确保在异步操作完成后更新状态
+      if (mounted) {
+        state = AsyncValue.data(connections);
+      }
     } catch (error, stackTrace) {
-      state = AsyncValue.error(error, stackTrace);
+      if (mounted) {
+        state = AsyncValue.error(error, stackTrace);
+      }
     }
   }
 

@@ -40,11 +40,11 @@ class SettingsRepository {
   }
 
   // 更新主题模式
-  Future<void> updateThemeMode(ThemeMode themeMode) async {
-    final settings = getSettings();
-    settings.themeMode = themeMode;
-    await saveSettings(settings);
-  }
+  // Future<void> updateThemeMode(ThemeMode themeMode) async {
+  //   final settings = getSettings();
+  //   settings.themeMode = themeMode;
+  //   await saveSettings(settings);
+  // }
 
   // 更新语言
   Future<void> updateLocale(String locale) async {

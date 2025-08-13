@@ -22,8 +22,8 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
   @override
   void initState() {
     super.initState();
-    // 刷新连接列表
-    _refreshConnections();
+    // 使用 Future.microtask 延迟刷新连接列表，确保在构建完成后执行
+    Future.microtask(() => _refreshConnections());
   }
 
   void _refreshConnections() {
