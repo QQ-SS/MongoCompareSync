@@ -440,9 +440,13 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                           : DatabaseTreeView(
                               connection: _sourceConnection,
                               onDatabaseSelected: (dbName) {
-                                setState(() {
-                                  _sourceDatabase = dbName;
-                                  _sourceCollection = null;
+                                WidgetsBinding.instance.addPostFrameCallback((
+                                  _,
+                                ) {
+                                  setState(() {
+                                    _sourceDatabase = dbName;
+                                    _sourceCollection = null;
+                                  });
                                 });
                               },
                               onCollectionSelected:
@@ -509,9 +513,13 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                           : DatabaseTreeView(
                               connection: _targetConnection,
                               onDatabaseSelected: (dbName) {
-                                setState(() {
-                                  _targetDatabase = dbName;
-                                  _targetCollection = null;
+                                WidgetsBinding.instance.addPostFrameCallback((
+                                  _,
+                                ) {
+                                  setState(() {
+                                    _targetDatabase = dbName;
+                                    _targetCollection = null;
+                                  });
                                 });
                               },
                               onCollectionSelected:
@@ -746,10 +754,13 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                                 : DatabaseTreeView(
                                     connection: _sourceConnection,
                                     onDatabaseSelected: (dbName) {
-                                      setState(() {
-                                        _sourceDatabase = dbName;
-                                        _sourceCollection = null;
-                                      });
+                                      WidgetsBinding.instance
+                                          .addPostFrameCallback((_) {
+                                            setState(() {
+                                              _sourceDatabase = dbName;
+                                              _sourceCollection = null;
+                                            });
+                                          });
                                     },
                                     onCollectionSelected:
                                         _handleSourceCollectionSelected,
@@ -809,10 +820,13 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                                 : DatabaseTreeView(
                                     connection: _targetConnection,
                                     onDatabaseSelected: (dbName) {
-                                      setState(() {
-                                        _targetDatabase = dbName;
-                                        _targetCollection = null;
-                                      });
+                                      WidgetsBinding.instance
+                                          .addPostFrameCallback((_) {
+                                            setState(() {
+                                              _targetDatabase = dbName;
+                                              _targetCollection = null;
+                                            });
+                                          });
                                     },
                                     onCollectionSelected:
                                         _handleTargetCollectionSelected,
