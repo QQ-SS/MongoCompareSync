@@ -6,9 +6,8 @@ part of 'collection.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_$MongoCollectionImpl _$$MongoCollectionImplFromJson(
-        Map<String, dynamic> json) =>
-    _$MongoCollectionImpl(
+MongoCollection _$MongoCollectionFromJson(Map<String, dynamic> json) =>
+    MongoCollection(
       name: json['name'] as String,
       database: json['database'] as String,
       connectionId: json['connectionId'] as String,
@@ -19,8 +18,7 @@ _$MongoCollectionImpl _$$MongoCollectionImplFromJson(
           const [],
     );
 
-Map<String, dynamic> _$$MongoCollectionImplToJson(
-        _$MongoCollectionImpl instance) =>
+Map<String, dynamic> _$MongoCollectionToJson(MongoCollection instance) =>
     <String, dynamic>{
       'name': instance.name,
       'database': instance.database,

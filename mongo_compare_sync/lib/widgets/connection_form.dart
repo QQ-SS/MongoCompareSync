@@ -34,7 +34,7 @@ class _ConnectionFormState extends ConsumerState<ConnectionForm> {
       text: connection?.host ?? 'localhost',
     );
     _portController = TextEditingController(
-      text: connection?.port?.toString() ?? '27017',
+      text: connection?.port.toString() ?? '27017',
     );
     _usernameController = TextEditingController(
       text: connection?.username ?? '',
@@ -42,7 +42,9 @@ class _ConnectionFormState extends ConsumerState<ConnectionForm> {
     _passwordController = TextEditingController(
       text: connection?.password ?? '',
     );
-    _databaseController = TextEditingController(text: connection?.authDb ?? '');
+    _databaseController = TextEditingController(
+      text: connection?.authSource ?? '',
+    );
     _isAuthEnabled = connection?.username?.isNotEmpty ?? false;
   }
 
@@ -151,7 +153,7 @@ class _ConnectionFormState extends ConsumerState<ConnectionForm> {
       port: int.tryParse(_portController.text) ?? 27017,
       username: _isAuthEnabled ? _usernameController.text : null,
       password: _isAuthEnabled ? _passwordController.text : null,
-      authDb: _databaseController.text,
+      authSource: _databaseController.text,
     );
   }
 

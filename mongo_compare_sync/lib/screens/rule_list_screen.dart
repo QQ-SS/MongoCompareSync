@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 import '../models/compare_rule.dart';
 import '../providers/rule_provider.dart';
-import '../repositories/compare_rule_repository.dart';
 import 'rule_edit_screen.dart';
 
 class RuleListScreen extends ConsumerStatefulWidget {

@@ -1,36 +1,80 @@
-import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:flutter/foundation.dart';
+import 'package:json_annotation/json_annotation.dart';
 
-part 'document.freezed.dart';
 part 'document.g.dart';
 
-@freezed
-class MongoDocument with _$MongoDocument {
-  const factory MongoDocument({
-    required String id,
-    required Map<String, dynamic> data,
-    required String collectionName,
-    required String databaseName,
-    required String connectionId,
-  }) = _MongoDocument;
+@JsonSerializable()
+class MongoDocument {
+  final String id;
+  final Map<String, dynamic> data;
+  final String collectionName;
+  final String databaseName;
+  final String connectionId;
+
+  MongoDocument({
+    required this.id,
+    required this.data,
+    required this.collectionName,
+    required this.databaseName,
+    required this.connectionId,
+  });
 
   factory MongoDocument.fromJson(Map<String, dynamic> json) =>
       _$MongoDocumentFromJson(json);
+
+  Map<String, dynamic> toJson() => _$MongoDocumentToJson(this);
+
+  MongoDocument copyWith({
+    String? id,
+    Map<String, dynamic>? data,
+    String? collectionName,
+    String? databaseName,
+    String? connectionId,
+  }) {
+    return MongoDocument(
+      id: id ?? this.id,
+      data: data ?? this.data,
+      collectionName: collectionName ?? this.collectionName,
+      databaseName: databaseName ?? this.databaseName,
+      connectionId: connectionId ?? this.connectionId,
+    );
+  }
 }
 
+@JsonEnum()
 enum DocumentDiffType { added, removed, modified, unchanged }
 
-@freezed
-class DocumentDiff with _$DocumentDiff {
-  const factory DocumentDiff({
-    required MongoDocument sourceDocument,
-    MongoDocument? targetDocument,
-    required DocumentDiffType diffType,
-    Map<String, dynamic>? fieldDiffs,
-  }) = _DocumentDiff;
+@JsonSerializable()
+class DocumentDiff {
+  final MongoDocument sourceDocument;
+  final MongoDocument? targetDocument;
+  final DocumentDiffType diffType;
+  final Map<String, dynamic>? fieldDiffs;
+
+  DocumentDiff({
+    required this.sourceDocument,
+    this.targetDocument,
+    required this.diffType,
+    this.fieldDiffs,
+  });
 
   factory DocumentDiff.fromJson(Map<String, dynamic> json) =>
       _$DocumentDiffFromJson(json);
+
+  Map<String, dynamic> toJson() => _$DocumentDiffToJson(this);
+
+  DocumentDiff copyWith({
+    MongoDocument? sourceDocument,
+    MongoDocument? targetDocument,
+    DocumentDiffType? diffType,
+    Map<String, dynamic>? fieldDiffs,
+  }) {
+    return DocumentDiff(
+      sourceDocument: sourceDocument ?? this.sourceDocument,
+      targetDocument: targetDocument ?? this.targetDocument,
+      diffType: diffType ?? this.diffType,
+      fieldDiffs: fieldDiffs ?? this.fieldDiffs,
+    );
+  }
 }
 
 // 字段差异模型 - 使用普通类而不是freezed

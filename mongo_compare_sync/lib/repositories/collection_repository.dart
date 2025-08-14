@@ -1,5 +1,4 @@
 import '../models/collection.dart';
-import '../models/connection.dart';
 import '../services/mongo_service.dart';
 
 class CollectionRepository {

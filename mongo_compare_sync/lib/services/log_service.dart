@@ -12,9 +12,15 @@ class LogService {
   late Logger _logger;
   bool _isEnabled = false;
   String? _logFilePath;
+  bool _isInitialized = false; // 添加初始化标志
 
-  LogService._internal() {
-    _initLogger();
+  LogService._internal(); // 构造函数不再直接调用 _initLogger
+
+  // 公共初始化方法
+  Future<void> init() async {
+    if (_isInitialized) return; // 如果已初始化，则直接返回
+    await _initLogger();
+    _isInitialized = true;
   }
 
   Future<void> _initLogger() async {
@@ -74,6 +80,7 @@ class LogService {
   Future<void> updateLoggingState(bool isEnabled) async {
     if (_isEnabled != isEnabled) {
       _isEnabled = isEnabled;
+      // 重新初始化 logger 以应用新的状态
       await _initLogger();
     }
   }

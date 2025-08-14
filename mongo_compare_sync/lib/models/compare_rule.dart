@@ -1,41 +1,82 @@
-import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:flutter/foundation.dart';
-import 'package:hive/hive.dart';
+import 'package:json_annotation/json_annotation.dart';
 
-part 'compare_rule.freezed.dart';
 part 'compare_rule.g.dart';
 
+@JsonEnum()
 enum RuleType {
   ignore, // 忽略字段
   transform, // 转换字段值后比较
   custom, // 自定义比较逻辑
 }
 
-@freezed
-class CompareRule with _$CompareRule {
-  @HiveType(typeId: 1)
-  const factory CompareRule({
-    @HiveField(0) required String id,
-    @HiveField(1) required String name,
-    @HiveField(2) required String description,
-    @HiveField(3) @Default([]) List<FieldRule> fieldRules,
-  }) = _CompareRule;
+@JsonSerializable()
+class CompareRule {
+  final String id;
+  final String name;
+  final String description;
+  final List<FieldRule> fieldRules;
+
+  CompareRule({
+    required this.id,
+    required this.name,
+    required this.description,
+    this.fieldRules = const [],
+  });
 
   factory CompareRule.fromJson(Map<String, dynamic> json) =>
       _$CompareRuleFromJson(json);
+
+  Map<String, dynamic> toJson() => _$CompareRuleToJson(this);
+
+  CompareRule copyWith({
+    String? id,
+    String? name,
+    String? description,
+    List<FieldRule>? fieldRules,
+  }) {
+    return CompareRule(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      fieldRules: fieldRules ?? this.fieldRules,
+    );
+  }
 }
 
-@freezed
-class FieldRule with _$FieldRule {
-  @HiveType(typeId: 2)
-  const factory FieldRule({
-    @HiveField(0) required String fieldPath,
-    @HiveField(1) required RuleType ruleType,
-    @HiveField(2) String? pattern,
-    @HiveField(3) String? transformFunction,
-    @HiveField(4) @Default(false) bool isRegex,
-  }) = _FieldRule;
+@JsonSerializable()
+class FieldRule {
+  final String fieldPath;
+  final RuleType ruleType;
+  final String? pattern;
+  final String? transformFunction;
+  final bool isRegex;
+
+  FieldRule({
+    required this.fieldPath,
+    required this.ruleType,
+    this.pattern,
+    this.transformFunction,
+    this.isRegex = false,
+  });
 
   factory FieldRule.fromJson(Map<String, dynamic> json) =>
       _$FieldRuleFromJson(json);
+
+  Map<String, dynamic> toJson() => _$FieldRuleToJson(this);
+
+  FieldRule copyWith({
+    String? fieldPath,
+    RuleType? ruleType,
+    String? pattern,
+    String? transformFunction,
+    bool? isRegex,
+  }) {
+    return FieldRule(
+      fieldPath: fieldPath ?? this.fieldPath,
+      ruleType: ruleType ?? this.ruleType,
+      pattern: pattern ?? this.pattern,
+      transformFunction: transformFunction ?? this.transformFunction,
+      isRegex: isRegex ?? this.isRegex,
+    );
+  }
 }

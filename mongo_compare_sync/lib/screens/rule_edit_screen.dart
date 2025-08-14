@@ -126,7 +126,7 @@ class _RuleEditScreenState extends ConsumerState<RuleEditScreen> {
             onEdit: () => _editFieldRule(index),
             onDelete: () => _deleteFieldRule(index),
           );
-        }).toList(),
+        }),
         if (_fieldRules.isEmpty)
           Center(
             child: Padding(

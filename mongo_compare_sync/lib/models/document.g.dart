@@ -6,8 +6,8 @@ part of 'document.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_$MongoDocumentImpl _$$MongoDocumentImplFromJson(Map<String, dynamic> json) =>
-    _$MongoDocumentImpl(
+MongoDocument _$MongoDocumentFromJson(Map<String, dynamic> json) =>
+    MongoDocument(
       id: json['id'] as String,
       data: json['data'] as Map<String, dynamic>,
       collectionName: json['collectionName'] as String,
@@ -15,7 +15,7 @@ _$MongoDocumentImpl _$$MongoDocumentImplFromJson(Map<String, dynamic> json) =>
       connectionId: json['connectionId'] as String,
     );
 
-Map<String, dynamic> _$$MongoDocumentImplToJson(_$MongoDocumentImpl instance) =>
+Map<String, dynamic> _$MongoDocumentToJson(MongoDocument instance) =>
     <String, dynamic>{
       'id': instance.id,
       'data': instance.data,
@@ -24,8 +24,7 @@ Map<String, dynamic> _$$MongoDocumentImplToJson(_$MongoDocumentImpl instance) =>
       'connectionId': instance.connectionId,
     };
 
-_$DocumentDiffImpl _$$DocumentDiffImplFromJson(Map<String, dynamic> json) =>
-    _$DocumentDiffImpl(
+DocumentDiff _$DocumentDiffFromJson(Map<String, dynamic> json) => DocumentDiff(
       sourceDocument: MongoDocument.fromJson(
           json['sourceDocument'] as Map<String, dynamic>),
       targetDocument: json['targetDocument'] == null
@@ -36,7 +35,7 @@ _$DocumentDiffImpl _$$DocumentDiffImplFromJson(Map<String, dynamic> json) =>
       fieldDiffs: json['fieldDiffs'] as Map<String, dynamic>?,
     );
 
-Map<String, dynamic> _$$DocumentDiffImplToJson(_$DocumentDiffImpl instance) =>
+Map<String, dynamic> _$DocumentDiffToJson(DocumentDiff instance) =>
     <String, dynamic>{
       'sourceDocument': instance.sourceDocument,
       'targetDocument': instance.targetDocument,

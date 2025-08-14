@@ -60,36 +60,36 @@ class PlatformService {
     if (isMacOS) {
       // macOS风格按钮
       return ButtonStyle(
-        padding: MaterialStateProperty.all(
+        padding: WidgetStateProperty.all(
           const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         ),
-        shape: MaterialStateProperty.all(
+        shape: WidgetStateProperty.all(
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(6.0)),
         ),
-        backgroundColor: MaterialStateProperty.resolveWith((states) {
-          if (states.contains(MaterialState.pressed)) {
+        backgroundColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.pressed)) {
             return theme.colorScheme.primary.withOpacity(0.8);
           }
           return theme.colorScheme.primary;
         }),
-        foregroundColor: MaterialStateProperty.all(theme.colorScheme.onPrimary),
+        foregroundColor: WidgetStateProperty.all(theme.colorScheme.onPrimary),
       );
     } else {
       // Windows风格按钮
       return ButtonStyle(
-        padding: MaterialStateProperty.all(
+        padding: WidgetStateProperty.all(
           const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         ),
-        shape: MaterialStateProperty.all(
+        shape: WidgetStateProperty.all(
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(4.0)),
         ),
-        backgroundColor: MaterialStateProperty.resolveWith((states) {
-          if (states.contains(MaterialState.pressed)) {
+        backgroundColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.pressed)) {
             return theme.colorScheme.primary.withOpacity(0.7);
           }
           return theme.colorScheme.primary;
         }),
-        foregroundColor: MaterialStateProperty.all(theme.colorScheme.onPrimary),
+        foregroundColor: WidgetStateProperty.all(theme.colorScheme.onPrimary),
       );
     }
   }

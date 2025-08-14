@@ -1,14 +1,16 @@
 import 'dart:async';
-import 'package:hive/hive.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'dart:convert';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
+import '../models/collection.dart';
 import '../models/connection.dart';
 import '../services/mongo_service.dart';
 
 class ConnectionRepository {
-  static const String _boxName = 'connections';
+  static const String _fileName = 'connections.json';
   final MongoService _mongoService;
-  late Box<MongoConnection> _connectionsBox;
+  List<MongoConnection> _currentConnections = []; // 内存中的连接列表
 
   // 单例模式
   static ConnectionRepository? _instance;
@@ -20,44 +22,85 @@ class ConnectionRepository {
 
   ConnectionRepository._internal(this._mongoService);
 
+  // 获取连接文件路径
+  Future<String> _getFilePath() async {
+    final directory = await getApplicationDocumentsDirectory();
+    return '${directory.path}/$_fileName';
+  }
+
+  // 从文件读取连接
+  Future<List<MongoConnection>?> _readConnectionsFromFile() async {
+    try {
+      final file = File(await _getFilePath());
+      if (await file.exists()) {
+        final contents = await file.readAsString();
+        final List<dynamic> jsonList = jsonDecode(contents);
+        return jsonList.map((json) => MongoConnection.fromJson(json)).toList();
+      }
+    } catch (e) {
+      print('Error reading connections from file: $e');
+    }
+    return null;
+  }
+
+  // 将连接写入文件
+  Future<void> _writeConnectionsToFile(
+    List<MongoConnection> connections,
+  ) async {
+    try {
+      final file = File(await _getFilePath());
+      final json = jsonEncode(
+        connections.map((conn) => conn.toJson()).toList(),
+      );
+      await file.writeAsString(json);
+    } catch (e) {
+      print('Error writing connections to file: $e');
+    }
+  }
+
   // 初始化存储库
   Future<void> init() async {
-    await Hive.initFlutter();
-    Hive.registerAdapter(MongoConnectionAdapter());
-    _connectionsBox = await Hive.openBox<MongoConnection>(_boxName);
+    _currentConnections = (await _readConnectionsFromFile()) ?? [];
   }
 
   // 获取所有连接
   List<MongoConnection> getAllConnections() {
-    return _connectionsBox.values.toList();
+    return List.from(_currentConnections); // 返回副本以防止外部修改
   }
 
   // 根据ID获取连接
   MongoConnection? getConnection(String id) {
-    return _connectionsBox.get(id);
+    return _currentConnections.firstWhereOrNull((conn) => conn.id == id);
   }
 
   // 保存连接
   Future<MongoConnection> saveConnection(MongoConnection connection) async {
     final String id = connection.id.isEmpty ? const Uuid().v4() : connection.id;
     final updatedConnection = connection.copyWith(id: id);
-    await _connectionsBox.put(id, updatedConnection);
+
+    final index = _currentConnections.indexWhere((conn) => conn.id == id);
+    if (index != -1) {
+      _currentConnections[index] = updatedConnection;
+    } else {
+      _currentConnections.add(updatedConnection);
+    }
+    await _writeConnectionsToFile(_currentConnections);
     return updatedConnection;
   }
 
   // 删除连接
   Future<void> deleteConnection(String id) async {
-    // 如果连接是活跃的，先断开连接
-    final connection = _connectionsBox.get(id);
+    final connection = getConnection(id);
     if (connection != null && connection.isConnected) {
       await _mongoService.disconnect(id);
     }
-    await _connectionsBox.delete(id);
+    _currentConnections.removeWhere((conn) => conn.id == id);
+    await _writeConnectionsToFile(_currentConnections);
   }
 
   // 连接到MongoDB
   Future<MongoConnection> connect(String id) async {
-    final connection = _connectionsBox.get(id);
+    final connection = getConnection(id);
     if (connection == null) {
       throw Exception('连接不存在');
     }
@@ -66,7 +109,7 @@ class ConnectionRepository {
     if (success) {
       // 更新连接状态
       final updatedConnection = connection.copyWith(isConnected: true);
-      await _connectionsBox.put(id, updatedConnection);
+      await saveConnection(updatedConnection); // 使用saveConnection来更新内存和文件
       return updatedConnection;
     } else {
       throw Exception('连接失败');
@@ -75,7 +118,7 @@ class ConnectionRepository {
 
   // 断开MongoDB连接
   Future<MongoConnection> disconnect(String id) async {
-    final connection = _connectionsBox.get(id);
+    final connection = getConnection(id);
     if (connection == null) {
       throw Exception('连接不存在');
     }
@@ -84,13 +127,13 @@ class ConnectionRepository {
 
     // 更新连接状态
     final updatedConnection = connection.copyWith(isConnected: false);
-    await _connectionsBox.put(id, updatedConnection);
+    await saveConnection(updatedConnection); // 使用saveConnection来更新内存和文件
     return updatedConnection;
   }
 
   // 获取数据库列表
   Future<List<String>> getDatabases(String connectionId) async {
-    final connection = _connectionsBox.get(connectionId);
+    final connection = getConnection(connectionId);
     if (connection == null) {
       throw Exception('连接不存在');
     }
@@ -103,44 +146,37 @@ class ConnectionRepository {
 
     // 更新连接中的数据库列表
     final updatedConnection = connection.copyWith(databases: databases);
-    await _connectionsBox.put(connectionId, updatedConnection);
+    await saveConnection(updatedConnection); // 使用saveConnection来更新内存和文件
 
     return databases;
   }
+
+  // 获取集合列表
+  Future<List<MongoCollection>> getCollections(
+    String connectionId,
+    String databaseName,
+  ) async {
+    final connection = getConnection(connectionId);
+    if (connection == null) {
+      throw Exception('连接不存在');
+    }
+
+    if (!connection.isConnected) {
+      throw Exception('连接未建立');
+    }
+
+    return await _mongoService.getCollections(connectionId, databaseName);
+  }
 }
 
-// Hive适配器
-class MongoConnectionAdapter extends TypeAdapter<MongoConnection> {
-  @override
-  final int typeId = 0;
-
-  @override
-  MongoConnection read(BinaryReader reader) {
-    return MongoConnection(
-      id: reader.readString(),
-      name: reader.readString(),
-      host: reader.readString(),
-      port: reader.readInt(),
-      username: reader.readString(),
-      password: reader.readString(),
-      authDb: reader.readString(),
-      useSsl: reader.readBool(),
-      databases: List<String>.from(reader.readList()),
-      isConnected: reader.readBool(),
-    );
-  }
-
-  @override
-  void write(BinaryWriter writer, MongoConnection obj) {
-    writer.writeString(obj.id);
-    writer.writeString(obj.name);
-    writer.writeString(obj.host);
-    writer.writeInt(obj.port);
-    writer.writeString(obj.username ?? '');
-    writer.writeString(obj.password ?? '');
-    writer.writeString(obj.authDb ?? '');
-    writer.writeBool(obj.useSsl ?? false);
-    writer.writeList(obj.databases);
-    writer.writeBool(obj.isConnected);
+// 扩展List，提供firstWhereOrNull方法 (如果compare_rule_repository.dart中已经有，这里可以省略)
+extension ListExtension<T> on List<T> {
+  T? firstWhereOrNull(bool Function(T element) test) {
+    for (var element in this) {
+      if (test(element)) {
+        return element;
+      }
+    }
+    return null;
   }
 }

@@ -7,7 +7,7 @@ import '../models/document.dart';
 import '../models/compare_rule.dart';
 import '../providers/connection_provider.dart' hide ConnectionState;
 import '../providers/rule_provider.dart';
-import '../widgets/database_browser.dart';
+import '../widgets/database_browser.dart'; // Now DatabaseTreeView
 import '../widgets/responsive_layout.dart';
 import '../widgets/loading_indicator.dart';
 import '../widgets/skeleton_loader.dart';
@@ -15,6 +15,7 @@ import '../services/platform_service.dart';
 import '../services/log_service.dart';
 import 'comparison_result_screen.dart';
 import 'rule_list_screen.dart';
+import '../repositories/connection_repository.dart'; // Import ConnectionRepository
 
 class CompareScreen extends ConsumerStatefulWidget {
   const CompareScreen({super.key});
@@ -59,7 +60,6 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
         setState(() {
           _sourceConnection = connections.first;
         });
-
         if (connections.length > 1) {
           setState(() {
             _targetConnection = connections[1];
@@ -67,25 +67,6 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
         }
       }
     });
-  }
-
-  // 检查连接是否存在
-  Future<bool> _checkConnectionExists(String connectionId) async {
-    try {
-      final connectionsState = ref.read(connectionsProvider);
-      bool exists = false;
-
-      connectionsState.whenData((connections) {
-        exists = connections.any(
-          (conn) => conn.id == connectionId && conn.isConnected,
-        );
-      });
-
-      return exists;
-    } catch (e) {
-      LogService.instance.error('检查连接是否存在失败', e);
-      return false;
-    }
   }
 
   void _handleSourceConnectionChanged(MongoConnection? connection) {
@@ -154,7 +135,9 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
   Widget _buildShortcutHint(PlatformService platformService) {
     return Card(
       elevation: 0,
-      color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+      color: Theme.of(
+        context,
+      ).colorScheme.surfaceContainerHighest.withOpacity(0.3),
       child: Padding(
         padding: const EdgeInsets.all(8.0),
         child: Row(
@@ -338,11 +321,9 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
 
     return connectionsState.when(
       data: (connections) {
-        final connectedConnections = connections
-            .where((conn) => conn.isConnected)
-            .toList();
+        final allConnections = connections;
 
-        if (connectedConnections.isEmpty) {
+        if (allConnections.isEmpty) {
           return Scaffold(
             body: Center(
               child: Column(
@@ -355,19 +336,17 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                   ),
                   const SizedBox(height: 16),
                   const Text(
-                    '没有活跃的数据库连接',
+                    '没有可用的数据库连接',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    '请先在连接管理页面连接至少一个数据库',
+                    '请先在连接管理页面添加至少一个数据库连接',
                     style: TextStyle(fontSize: 16, color: Colors.grey),
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton.icon(
                     onPressed: () {
-                      // 使用 Navigator.of(context).pushReplacementNamed 替换当前路由，
-                      // 而不是简单地 pop 当前界面
                       Navigator.of(context).pushNamedAndRemoveUntil(
                         '/', // 主页路由
                         (route) => false, // 移除所有路由
@@ -386,14 +365,14 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
         return ResponsiveLayout(
           // 小屏幕布局 - 垂直排列
           small: _buildSmallScreenLayout(
-            connectedConnections,
+            allConnections,
             platformService,
             spacing,
           ),
 
           // 中等屏幕和大屏幕布局 - 水平排列
           medium: _buildLargeScreenLayout(
-            connectedConnections,
+            allConnections,
             platformService,
             spacing,
           ),
@@ -465,7 +444,7 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
 
   // 小屏幕布局
   Widget _buildSmallScreenLayout(
-    List<MongoConnection> connectedConnections,
+    List<MongoConnection> allConnections,
     PlatformService platformService,
     double spacing,
   ) {
@@ -480,16 +459,16 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
               _buildShortcutHint(platformService),
               SizedBox(height: spacing),
 
-              // 连接选择区域
-              _buildConnectionSelector(
-                '源数据库',
-                _sourceConnection,
-                connectedConnections,
-                _handleSourceConnectionChanged,
+              // 源连接选择
+              _buildConnectionDropdown(
+                label: '源连接',
+                selectedConnection: _sourceConnection,
+                connections: allConnections,
+                onConnectionChanged: _handleSourceConnectionChanged,
               ),
               SizedBox(height: spacing),
 
-              // 源数据库浏览器
+              // 源数据库和集合树形视图
               Card(
                 elevation: platformService.getPlatformElevation(),
                 child: Column(
@@ -501,7 +480,7 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                         children: [
                           Expanded(
                             child: Text(
-                              '源数据库: ${_sourceConnection?.name ?? "未选择"}',
+                              '源集合: ${_sourceConnection?.name ?? "未选择"} > ${_sourceDatabase ?? "未选择"}',
                               style: Theme.of(context).textTheme.titleMedium,
                             ),
                           ),
@@ -529,51 +508,19 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                       height: 200,
                       child: _sourceConnection == null
                           ? const Center(child: Text('请选择源数据库连接'))
-                          : FutureBuilder<bool>(
-                              future: _checkConnectionExists(
-                                _sourceConnection!.id,
-                              ),
-                              builder: (context, snapshot) {
-                                if (snapshot.connectionState ==
-                                    ConnectionState.waiting) {
-                                  return const Center(
-                                    child: CircularProgressIndicator(),
-                                  );
-                                }
-
-                                if (snapshot.hasError ||
-                                    snapshot.data == false) {
-                                  return Center(
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          '连接不可用，请重新选择连接',
-                                          style: TextStyle(
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.error,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        ElevatedButton(
-                                          onPressed: _loadConnections,
-                                          child: const Text('刷新连接'),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                }
-
-                                return DatabaseBrowser(
-                                  connection: _sourceConnection!,
-                                  onCollectionSelected:
-                                      _handleSourceCollectionSelected,
-                                  selectedDatabase: _sourceDatabase,
-                                  selectedCollection: _sourceCollection,
-                                );
+                          : DatabaseTreeView(
+                              connection: _sourceConnection,
+                              onDatabaseSelected: (dbName) {
+                                setState(() {
+                                  _sourceDatabase = dbName;
+                                  _sourceCollection = null;
+                                });
                               },
+                              onCollectionSelected:
+                                  _handleSourceCollectionSelected,
+                              selectedDatabase: _sourceDatabase,
+                              selectedCollection: _sourceCollection,
+                              isSource: true,
                             ),
                     ),
                   ],
@@ -582,15 +529,15 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
               SizedBox(height: spacing),
 
               // 目标连接选择
-              _buildConnectionSelector(
-                '目标数据库',
-                _targetConnection,
-                connectedConnections,
-                _handleTargetConnectionChanged,
+              _buildConnectionDropdown(
+                label: '目标连接',
+                selectedConnection: _targetConnection,
+                connections: allConnections,
+                onConnectionChanged: _handleTargetConnectionChanged,
               ),
               SizedBox(height: spacing),
 
-              // 目标数据库浏览器
+              // 目标数据库和集合树形视图
               Card(
                 elevation: platformService.getPlatformElevation(),
                 child: Column(
@@ -602,7 +549,7 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                         children: [
                           Expanded(
                             child: Text(
-                              '目标数据库: ${_targetConnection?.name ?? "未选择"}',
+                              '目标集合: ${_targetConnection?.name ?? "未选择"} > ${_targetDatabase ?? "未选择"}',
                               style: Theme.of(context).textTheme.titleMedium,
                             ),
                           ),
@@ -630,51 +577,19 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                       height: 200,
                       child: _targetConnection == null
                           ? const Center(child: Text('请选择目标数据库连接'))
-                          : FutureBuilder<bool>(
-                              future: _checkConnectionExists(
-                                _targetConnection!.id,
-                              ),
-                              builder: (context, snapshot) {
-                                if (snapshot.connectionState ==
-                                    ConnectionState.waiting) {
-                                  return const Center(
-                                    child: CircularProgressIndicator(),
-                                  );
-                                }
-
-                                if (snapshot.hasError ||
-                                    snapshot.data == false) {
-                                  return Center(
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          '连接不可用，请重新选择连接',
-                                          style: TextStyle(
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.error,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        ElevatedButton(
-                                          onPressed: _loadConnections,
-                                          child: const Text('刷新连接'),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                }
-
-                                return DatabaseBrowser(
-                                  connection: _targetConnection!,
-                                  onCollectionSelected:
-                                      _handleTargetCollectionSelected,
-                                  selectedDatabase: _targetDatabase,
-                                  selectedCollection: _targetCollection,
-                                );
+                          : DatabaseTreeView(
+                              connection: _targetConnection,
+                              onDatabaseSelected: (dbName) {
+                                setState(() {
+                                  _targetDatabase = dbName;
+                                  _targetCollection = null;
+                                });
                               },
+                              onCollectionSelected:
+                                  _handleTargetCollectionSelected,
+                              selectedDatabase: _targetDatabase,
+                              selectedCollection: _targetCollection,
+                              isSource: false,
                             ),
                     ),
                   ],
@@ -835,7 +750,7 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
 
   // 大屏幕布局
   Widget _buildLargeScreenLayout(
-    List<MongoConnection> connectedConnections,
+    List<MongoConnection> allConnections,
     PlatformService platformService,
     double spacing,
   ) {
@@ -852,20 +767,20 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
             Row(
               children: [
                 Expanded(
-                  child: _buildConnectionSelector(
-                    '源数据库',
-                    _sourceConnection,
-                    connectedConnections,
-                    _handleSourceConnectionChanged,
+                  child: _buildConnectionDropdown(
+                    label: '源连接',
+                    selectedConnection: _sourceConnection,
+                    connections: allConnections,
+                    onConnectionChanged: _handleSourceConnectionChanged,
                   ),
                 ),
                 SizedBox(width: spacing),
                 Expanded(
-                  child: _buildConnectionSelector(
-                    '目标数据库',
-                    _targetConnection,
-                    connectedConnections,
-                    _handleTargetConnectionChanged,
+                  child: _buildConnectionDropdown(
+                    label: '目标连接',
+                    selectedConnection: _targetConnection,
+                    connections: allConnections,
+                    onConnectionChanged: _handleTargetConnectionChanged,
                   ),
                 ),
               ],
@@ -877,7 +792,7 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // 源数据库浏览器
+                  // 源集合浏览器
                   Expanded(
                     child: Card(
                       elevation: platformService.getPlatformElevation(),
@@ -890,7 +805,7 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                               children: [
                                 Expanded(
                                   child: Text(
-                                    '源数据库: ${_sourceConnection?.name ?? "未选择"}',
+                                    '源集合: ${_sourceConnection?.name ?? "未选择"} > ${_sourceDatabase ?? "未选择"}',
                                     style: Theme.of(
                                       context,
                                     ).textTheme.titleMedium,
@@ -919,51 +834,19 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                           Expanded(
                             child: _sourceConnection == null
                                 ? const Center(child: Text('请选择源数据库连接'))
-                                : FutureBuilder<bool>(
-                                    future: _checkConnectionExists(
-                                      _sourceConnection!.id,
-                                    ),
-                                    builder: (context, snapshot) {
-                                      if (snapshot.connectionState ==
-                                          ConnectionState.waiting) {
-                                        return const Center(
-                                          child: CircularProgressIndicator(),
-                                        );
-                                      }
-
-                                      if (snapshot.hasError ||
-                                          snapshot.data == false) {
-                                        return Center(
-                                          child: Column(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Text(
-                                                '连接不可用，请重新选择连接',
-                                                style: TextStyle(
-                                                  color: Theme.of(
-                                                    context,
-                                                  ).colorScheme.error,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 8),
-                                              ElevatedButton(
-                                                onPressed: _loadConnections,
-                                                child: const Text('刷新连接'),
-                                              ),
-                                            ],
-                                          ),
-                                        );
-                                      }
-
-                                      return DatabaseBrowser(
-                                        connection: _sourceConnection!,
-                                        onCollectionSelected:
-                                            _handleSourceCollectionSelected,
-                                        selectedDatabase: _sourceDatabase,
-                                        selectedCollection: _sourceCollection,
-                                      );
+                                : DatabaseTreeView(
+                                    connection: _sourceConnection,
+                                    onDatabaseSelected: (dbName) {
+                                      setState(() {
+                                        _sourceDatabase = dbName;
+                                        _sourceCollection = null;
+                                      });
                                     },
+                                    onCollectionSelected:
+                                        _handleSourceCollectionSelected,
+                                    selectedDatabase: _sourceDatabase,
+                                    selectedCollection: _sourceCollection,
+                                    isSource: true,
                                   ),
                           ),
                         ],
@@ -972,7 +855,7 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                   ),
                   SizedBox(width: spacing),
 
-                  // 目标数据库浏览器
+                  // 目标集合浏览器
                   Expanded(
                     child: Card(
                       elevation: platformService.getPlatformElevation(),
@@ -985,7 +868,7 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                               children: [
                                 Expanded(
                                   child: Text(
-                                    '目标数据库: ${_targetConnection?.name ?? "未选择"}',
+                                    '目标集合: ${_targetConnection?.name ?? "未选择"} > ${_targetDatabase ?? "未选择"}',
                                     style: Theme.of(
                                       context,
                                     ).textTheme.titleMedium,
@@ -1014,51 +897,19 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                           Expanded(
                             child: _targetConnection == null
                                 ? const Center(child: Text('请选择目标数据库连接'))
-                                : FutureBuilder<bool>(
-                                    future: _checkConnectionExists(
-                                      _targetConnection!.id,
-                                    ),
-                                    builder: (context, snapshot) {
-                                      if (snapshot.connectionState ==
-                                          ConnectionState.waiting) {
-                                        return const Center(
-                                          child: CircularProgressIndicator(),
-                                        );
-                                      }
-
-                                      if (snapshot.hasError ||
-                                          snapshot.data == false) {
-                                        return Center(
-                                          child: Column(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Text(
-                                                '连接不可用，请重新选择连接',
-                                                style: TextStyle(
-                                                  color: Theme.of(
-                                                    context,
-                                                  ).colorScheme.error,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 8),
-                                              ElevatedButton(
-                                                onPressed: _loadConnections,
-                                                child: const Text('刷新连接'),
-                                              ),
-                                            ],
-                                          ),
-                                        );
-                                      }
-
-                                      return DatabaseBrowser(
-                                        connection: _targetConnection!,
-                                        onCollectionSelected:
-                                            _handleTargetCollectionSelected,
-                                        selectedDatabase: _targetDatabase,
-                                        selectedCollection: _targetCollection,
-                                      );
+                                : DatabaseTreeView(
+                                    connection: _targetConnection,
+                                    onDatabaseSelected: (dbName) {
+                                      setState(() {
+                                        _targetDatabase = dbName;
+                                        _targetCollection = null;
+                                      });
                                     },
+                                    onCollectionSelected:
+                                        _handleTargetCollectionSelected,
+                                    selectedDatabase: _targetDatabase,
+                                    selectedCollection: _targetCollection,
+                                    isSource: false,
                                   ),
                           ),
                         ],
@@ -1196,12 +1047,12 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
     );
   }
 
-  Widget _buildConnectionSelector(
-    String label,
-    MongoConnection? selectedConnection,
-    List<MongoConnection> connections,
-    Function(MongoConnection?) onChanged,
-  ) {
+  Widget _buildConnectionDropdown({
+    required String label,
+    required MongoConnection? selectedConnection,
+    required List<MongoConnection> connections,
+    required Function(MongoConnection?) onConnectionChanged,
+  }) {
     // 确保连接ID唯一性
     final uniqueConnections = <String, MongoConnection>{};
     for (final conn in connections) {
@@ -1220,10 +1071,11 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
         Text(label, style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
         DropdownButtonFormField<String?>(
-          value: selectedConnectionExists ? selectedConnection?.id : null,
+          value: selectedConnectionExists ? selectedConnection.id : null,
           decoration: InputDecoration(
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+            hintText: '选择连接',
           ),
           items: uniqueConnectionsList.map((conn) {
             return DropdownMenuItem<String?>(
@@ -1237,9 +1089,9 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                 (conn) => conn.id == value,
                 orElse: () => uniqueConnectionsList.first,
               );
-              onChanged(connection);
+              onConnectionChanged(connection);
             } else {
-              onChanged(null);
+              onConnectionChanged(null);
             }
           },
         ),
@@ -1276,7 +1128,7 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
             value: rule.id,
             child: Text(rule.name),
           );
-        }).toList(),
+        }),
       ],
       onChanged: (value) {
         setState(() {

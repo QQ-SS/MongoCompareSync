@@ -399,7 +399,9 @@ class _ComparisonResultScreenState
       padding: EdgeInsets.all(
         ResponsiveLayoutUtil.getResponsiveSpacing(context),
       ),
-      color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+      color: Theme.of(
+        context,
+      ).colorScheme.surfaceContainerHighest.withOpacity(0.3),
       child: isSmallScreen
           ? Wrap(
               alignment: WrapAlignment.spaceAround,
@@ -529,7 +531,7 @@ class _ComparisonResultScreenState
         title: const Text('同步数据'),
         content: StatefulBuilder(
           builder: (context, setState) {
-            return Container(
+            return SizedBox(
               width: dialogWidth,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -742,7 +744,7 @@ class _ComparisonResultScreenState
         title: const Text('导出比较结果'),
         content: StatefulBuilder(
           builder: (context, setState) {
-            return Container(
+            return SizedBox(
               width: dialogWidth,
               child: Column(
                 mainAxisSize: MainAxisSize.min,

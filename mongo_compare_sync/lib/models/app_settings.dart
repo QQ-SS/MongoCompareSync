@@ -1,45 +1,32 @@
 import 'package:flutter/material.dart';
-import 'package:hive/hive.dart';
+import 'package:json_annotation/json_annotation.dart';
 
 part 'app_settings.g.dart';
 
-@HiveType(typeId: 4)
-class AppSettings extends HiveObject {
-  @HiveField(0)
-  String id;
+@JsonSerializable()
+class AppSettings {
+  final String id;
 
   // 主题设置
-  @HiveField(1)
-  int themeModeIndex;
+  final int themeModeIndex;
 
   // 语言设置
-  @HiveField(2)
-  String locale;
+  final String locale;
 
   // 数据显示设置
-  @HiveField(3)
-  int pageSize;
-
-  @HiveField(4)
-  bool showObjectIds;
+  final int pageSize;
+  final bool showObjectIds;
 
   // 比较设置
-  @HiveField(5)
-  String? defaultRuleId;
-
-  @HiveField(6)
-  bool caseSensitiveComparison;
+  final String? defaultRuleId;
+  final bool caseSensitiveComparison;
 
   // 导出设置
-  @HiveField(7)
-  int defaultExportFormatIndex;
+  final int defaultExportFormatIndex;
 
   // 其他设置
-  @HiveField(8)
-  bool confirmBeforeSync;
-
-  @HiveField(9)
-  bool enableLogging;
+  final bool confirmBeforeSync;
+  final bool enableLogging;
 
   AppSettings({
     required this.id,
@@ -54,14 +41,19 @@ class AppSettings extends HiveObject {
     this.enableLogging = false,
   });
 
+  factory AppSettings.fromJson(Map<String, dynamic> json) =>
+      _$AppSettingsFromJson(json);
+
+  Map<String, dynamic> toJson() => _$AppSettingsToJson(this);
+
   // 获取主题模式
   ThemeMode get themeMode {
     return ThemeMode.values[themeModeIndex];
   }
 
   // 设置主题模式
-  set themeMode(ThemeMode mode) {
-    themeModeIndex = mode.index;
+  AppSettings copyWithThemeMode(ThemeMode mode) {
+    return copyWith(themeModeIndex: mode.index);
   }
 
   // 获取导出格式
@@ -70,23 +62,43 @@ class AppSettings extends HiveObject {
   }
 
   // 设置导出格式
-  set defaultExportFormat(ExportFormat format) {
-    defaultExportFormatIndex = format.index;
+  AppSettings copyWithDefaultExportFormat(ExportFormat format) {
+    return copyWith(defaultExportFormatIndex: format.index);
   }
 
   // 创建默认设置
   static AppSettings createDefault(String id) {
     return AppSettings(id: id);
   }
+
+  AppSettings copyWith({
+    String? id,
+    int? themeModeIndex,
+    String? locale,
+    int? pageSize,
+    bool? showObjectIds,
+    String? defaultRuleId,
+    bool? caseSensitiveComparison,
+    int? defaultExportFormatIndex,
+    bool? confirmBeforeSync,
+    bool? enableLogging,
+  }) {
+    return AppSettings(
+      id: id ?? this.id,
+      themeModeIndex: themeModeIndex ?? this.themeModeIndex,
+      locale: locale ?? this.locale,
+      pageSize: pageSize ?? this.pageSize,
+      showObjectIds: showObjectIds ?? this.showObjectIds,
+      defaultRuleId: defaultRuleId ?? this.defaultRuleId,
+      caseSensitiveComparison:
+          caseSensitiveComparison ?? this.caseSensitiveComparison,
+      defaultExportFormatIndex:
+          defaultExportFormatIndex ?? this.defaultExportFormatIndex,
+      confirmBeforeSync: confirmBeforeSync ?? this.confirmBeforeSync,
+      enableLogging: enableLogging ?? this.enableLogging,
+    );
+  }
 }
 
-// 导出格式枚举
-@HiveType(typeId: 5)
-enum ExportFormat {
-  @HiveField(0)
-  json,
-  @HiveField(1)
-  csv,
-  @HiveField(2)
-  markdown,
-}
+@JsonEnum()
+enum ExportFormat { json, csv, markdown }

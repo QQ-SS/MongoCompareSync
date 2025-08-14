@@ -120,9 +120,9 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
                     if (connection.username != null &&
                         connection.username!.isNotEmpty)
                       _buildDetailRow('用户名', connection.username!),
-                    if (connection.authDb != null &&
-                        connection.authDb!.isNotEmpty)
-                      _buildDetailRow('认证数据库', connection.authDb!),
+                    if (connection.authSource != null &&
+                        connection.authSource!.isNotEmpty)
+                      _buildDetailRow('认证数据库', connection.authSource!),
                     _buildDetailRow(
                       'SSL',
                       connection.useSsl == true ? '启用' : '禁用',

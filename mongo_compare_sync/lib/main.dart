@@ -1,25 +1,21 @@
 import 'dart:async';
-import 'dart:io';
+import 'dart:io'; // 引入dart:io以使用File
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:path_provider/path_provider.dart'; // 仍然需要获取应用文档目录
 import 'screens/home_screen.dart';
-import 'models/hive_adapters.dart';
-import 'repositories/compare_rule_repository.dart';
-import 'repositories/connection_repository.dart';
-import 'services/mongo_service.dart';
+import 'repositories/settings_repository.dart'; // 引入SettingsRepository
+import 'services/mongo_service.dart'; // 引入MongoService
+import 'repositories/compare_rule_repository.dart'; // 引入CompareRuleRepository
+import 'repositories/connection_repository.dart'; // 引入ConnectionRepository
 import 'services/log_service.dart';
 import 'services/error_service.dart';
 import 'services/platform_service.dart';
 import 'providers/settings_provider.dart';
 
 void main() async {
-  // 确保Flutter绑定初始化
-  WidgetsFlutterBinding.ensureInitialized();
-
   // 初始化错误捕获
   final errorService = ErrorService();
   errorService.initErrorCapture();
@@ -27,34 +23,35 @@ void main() async {
   // 使用runZonedGuarded捕获未处理的异步错误
   runZonedGuarded(
     () async {
+      // 确保Flutter绑定初始化
+      WidgetsFlutterBinding.ensureInitialized();
       try {
-        // 初始化Hive
-        final appDocumentDir = await getApplicationDocumentsDirectory();
-        await Hive.initFlutter(appDocumentDir.path);
+        // 初始化LogService
+        await LogService.instance.init();
 
-        // 注册Hive适配器
-        registerHiveAdapters();
+        // 初始化SettingsRepository (现在使用文件系统)
+        await SettingsRepository().init();
 
-        // 初始化规则存储库
+        // 初始化MongoService
+        final mongoService = MongoService();
+
+        // 初始化CompareRuleRepository
         await CompareRuleRepository().init();
 
-        // 初始化连接存储库
-        final mongoService = MongoService();
+        // 初始化ConnectionRepository
         await ConnectionRepository(mongoService: mongoService).init();
 
         // 运行应用
         runApp(const ProviderScope(child: MongoCompareSyncApp()));
       } catch (e, stackTrace) {
         // 记录启动错误
-        final logService = LogService();
-        logService.fatal('应用启动失败', e, stackTrace);
+        LogService.instance.fatal('应用启动失败', e, stackTrace);
         rethrow; // 重新抛出异常，让Flutter显示错误屏幕
       }
     },
     (error, stackTrace) {
       // 处理未捕获的异步错误
-      final logService = LogService();
-      logService.fatal('未捕获的异步错误', error, stackTrace);
+      LogService.instance.fatal('未捕获的异步错误', error, stackTrace);
     },
   );
 }
@@ -114,8 +111,8 @@ class MongoCompareSyncApp extends ConsumerWidget {
     final lightThemeWithPlatformStyles = lightTheme.copyWith(
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ButtonStyle(
-          elevation: MaterialStateProperty.all(elevation),
-          shape: MaterialStateProperty.all(
+          elevation: WidgetStateProperty.all(elevation),
+          shape: WidgetStateProperty.all(
             RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(borderRadius),
             ),
@@ -132,8 +129,8 @@ class MongoCompareSyncApp extends ConsumerWidget {
         ),
       ),
       scrollbarTheme: ScrollbarThemeData(
-        thickness: MaterialStateProperty.all(8.0),
-        thumbVisibility: MaterialStateProperty.all(true),
+        thickness: WidgetStateProperty.all(8.0),
+        thumbVisibility: WidgetStateProperty.all(true),
         radius: Radius.circular(borderRadius),
       ),
     );
@@ -141,8 +138,8 @@ class MongoCompareSyncApp extends ConsumerWidget {
     final darkThemeWithPlatformStyles = darkTheme.copyWith(
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ButtonStyle(
-          elevation: MaterialStateProperty.all(elevation),
-          shape: MaterialStateProperty.all(
+          elevation: WidgetStateProperty.all(elevation),
+          shape: WidgetStateProperty.all(
             RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(borderRadius),
             ),
@@ -159,8 +156,8 @@ class MongoCompareSyncApp extends ConsumerWidget {
         ),
       ),
       scrollbarTheme: ScrollbarThemeData(
-        thickness: MaterialStateProperty.all(8.0),
-        thumbVisibility: MaterialStateProperty.all(true),
+        thickness: WidgetStateProperty.all(8.0),
+        thumbVisibility: WidgetStateProperty.all(true),
         radius: Radius.circular(borderRadius),
       ),
     );

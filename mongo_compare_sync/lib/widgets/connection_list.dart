@@ -61,7 +61,7 @@ class ConnectionList extends ConsumerWidget {
                   ],
                 ),
                 subtitle: Text(
-                  '${connection.host}:${connection.port}${connection.authDb != null && connection.authDb!.isNotEmpty ? '/${connection.authDb}' : ''}',
+                  '${connection.host}:${connection.port}${connection.authSource != null && connection.authSource!.isNotEmpty ? '/?authSource=${connection.authSource}' : ''}',
                 ),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
