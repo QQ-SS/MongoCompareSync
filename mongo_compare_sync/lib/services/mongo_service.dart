@@ -79,18 +79,40 @@ class MongoService {
     }
     final db = _connections[connectionId]!.db;
     try {
-      final List<dynamic> databasesInfo = await db.listDatabases();
-      final databases = databasesInfo
-          .map((dbInfo) {
-            if (dbInfo is Map) {
-              return dbInfo['name'] as String?;
-            }
-            return null;
-          })
-          .whereType<String>()
+      LogService.instance.info('正在获取数据库列表，连接ID: $connectionId');
+      final databasesInfo = await db.listDatabases();
+      LogService.instance.info('原始数据库信息: $databasesInfo');
+      LogService.instance.info('数据库信息类型: ${databasesInfo.runtimeType}');
+
+      List<String> allDatabases = [];
+
+      // 根据日志，databasesInfo 是一个字符串列表: [SqlSugarDb, admin, config, local, testDB]
+      // 直接转换为字符串列表
+      if (databasesInfo is List) {
+        LogService.instance.info('处理List类型数据，长度: ${databasesInfo.length}');
+
+        // 将所有项目转换为字符串
+        allDatabases = databasesInfo.map((item) => item.toString()).toList();
+        LogService.instance.info('转换后的数据库列表: $allDatabases');
+      } else {
+        LogService.instance.info('非List类型数据，直接转换为字符串');
+        allDatabases = [databasesInfo.toString()];
+      }
+
+      LogService.instance.info('所有数据库: $allDatabases');
+
+      // 过滤用户数据库
+      final userDatabases = allDatabases
           .where((name) => !['admin', 'local', 'config'].contains(name))
           .toList();
-      return databases;
+
+      LogService.instance.info('用户数据库: $userDatabases');
+
+      // 返回用户数据库，如果没有则返回所有数据库
+      final result = userDatabases.isNotEmpty ? userDatabases : allDatabases;
+      LogService.instance.info('最终返回的数据库列表: $result');
+
+      return result;
     } catch (e, stackTrace) {
       LogService.instance.error('获取数据库列表错误: $e', e, stackTrace);
       rethrow;

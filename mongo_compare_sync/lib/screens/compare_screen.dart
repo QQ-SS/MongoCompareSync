@@ -41,15 +41,10 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
     super.initState();
     // 获取已保存的连接
     _loadConnections();
-
-    // 注册快捷键
-    _registerShortcuts();
   }
 
   @override
   void dispose() {
-    // 清理快捷键
-    _unregisterShortcuts();
     super.dispose();
   }
 
@@ -97,68 +92,6 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
       _targetDatabase = database;
       _targetCollection = collection;
     });
-  }
-
-  // 注册平台特定的快捷键
-  void _registerShortcuts() {
-    final platformService = PlatformService.instance;
-
-    // 比较快捷键 (Ctrl+Enter 或 Cmd+Enter)
-    final compareShortcut = LogicalKeySet(
-      platformService.isMacOS
-          ? LogicalKeyboardKey.meta
-          : LogicalKeyboardKey.control,
-      LogicalKeyboardKey.enter,
-    );
-
-    // 添加快捷键处理
-    ServicesBinding.instance.keyboard.addHandler((event) {
-      if (compareShortcut.accepts(event, HardwareKeyboard.instance)) {
-        if (_sourceCollection != null &&
-            _targetCollection != null &&
-            !_isComparing) {
-          _compareCollections();
-          return true;
-        }
-      }
-      return false;
-    });
-  }
-
-  // 清理快捷键
-  void _unregisterShortcuts() {
-    // 移除快捷键处理
-    ServicesBinding.instance.keyboard.removeHandler((event) => false);
-  }
-
-  // 构建快捷键提示
-  Widget _buildShortcutHint(PlatformService platformService) {
-    return Card(
-      elevation: 0,
-      color: Theme.of(
-        context,
-      ).colorScheme.surfaceContainerHighest.withOpacity(0.3),
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Row(
-          children: [
-            Icon(
-              Icons.keyboard,
-              size: 16,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              '快捷键: ${platformService.isMacOS ? "⌘ + Enter 执行比较" : "Ctrl + Enter 执行比较"}',
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   // 构建比较结果预览
@@ -455,10 +388,6 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // 快捷键提示
-              _buildShortcutHint(platformService),
-              SizedBox(height: spacing),
-
               // 源连接选择
               _buildConnectionDropdown(
                 label: '源连接',
@@ -677,22 +606,6 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                             ),
                           ),
                         ),
-
-                      // 快捷键提示
-                      if (_sourceCollection != null &&
-                          _targetCollection != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text(
-                            platformService.isMacOS
-                                ? '快捷键: ⌘ + Enter'
-                                : '快捷键: Ctrl + Enter',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.outline,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
                     ],
                   ),
                 ),
@@ -759,10 +672,6 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
         padding: EdgeInsets.all(spacing),
         child: Column(
           children: [
-            // 快捷键提示
-            _buildShortcutHint(platformService),
-            SizedBox(height: spacing),
-
             // 连接选择区域
             Row(
               children: [

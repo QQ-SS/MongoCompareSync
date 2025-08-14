@@ -108,6 +108,16 @@ class _DatabaseTreeViewState extends ConsumerState<DatabaseTreeView> {
 
     try {
       final repository = ref.read(connectionRepositoryProvider);
+
+      // 检查连接状态，如果未连接则先建立连接
+      if (!widget.connection!.isConnected) {
+        LogService.instance.info('连接未建立，正在尝试连接到: ${widget.connection!.name}');
+        await repository.connect(widget.connection!.id);
+
+        // 连接成功后，刷新连接提供者以获取最新的连接状态
+        ref.read(connectionsProvider.notifier).refreshConnections();
+      }
+
       final databases = await repository.getDatabases(widget.connection!.id);
       if (mounted) {
         setState(() {
