@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/settings_provider.dart';
+import 'log_viewer_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -194,6 +195,20 @@ class SettingsScreen extends ConsumerWidget {
                     value: enableLogging,
                     onChanged: (value) {
                       ref.read(enableLoggingProvider.notifier).state = value;
+                    },
+                  ),
+                  const Divider(),
+                  ListTile(
+                    title: const Text('查看日志文件'),
+                    subtitle: const Text('查看应用程序的日志记录'),
+                    trailing: const Icon(Icons.arrow_forward_ios),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const LogViewerScreen(),
+                        ),
+                      );
                     },
                   ),
                 ],
