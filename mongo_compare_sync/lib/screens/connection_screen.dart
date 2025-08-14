@@ -18,6 +18,8 @@ class ConnectionScreen extends ConsumerStatefulWidget {
 class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
   MongoConnection? _selectedConnection;
   bool _isEditing = false;
+  bool _isTesting = false;
+  String? _testResult;
 
   @override
   void initState() {
@@ -55,6 +57,28 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
         _isEditing = false;
       });
       ref.read(selectedConnectionProvider.notifier).state = null;
+    }
+  }
+
+  Future<void> _testConnection(MongoConnection connection) async {
+    setState(() {
+      _isTesting = true;
+      _testResult = null;
+    });
+
+    try {
+      final notifier = ref.read(connectionsProvider.notifier);
+      final isConnected = await notifier.testConnection(connection);
+
+      setState(() {
+        _isTesting = false;
+        _testResult = isConnected ? '连接成功！' : '连接失败，请检查连接信息。';
+      });
+    } catch (e) {
+      setState(() {
+        _isTesting = false;
+        _testResult = '连接错误: ${e.toString()}';
+      });
     }
   }
 
@@ -133,9 +157,35 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
               ),
             ),
             const SizedBox(height: 24),
+            if (_testResult != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Text(
+                  _testResult!,
+                  style: TextStyle(
+                    color: _testResult!.contains('成功')
+                        ? Colors.green
+                        : Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                ElevatedButton.icon(
+                  onPressed: _isTesting
+                      ? null
+                      : () => _testConnection(connection),
+                  icon: _isTesting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.check_circle),
+                  label: const Text('测试连接'),
+                ),
                 ElevatedButton.icon(
                   onPressed: () {
                     setState(() {
@@ -145,7 +195,6 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
                   icon: const Icon(Icons.edit),
                   label: const Text('编辑'),
                 ),
-                // Removed ConnectionButton
               ],
             ),
           ],
