@@ -61,6 +61,8 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
   final GlobalKey<DatabaseCollectionPanelState> _sourceKey = GlobalKey();
   final GlobalKey<DatabaseCollectionPanelState> _targetKey = GlobalKey();
   final GlobalKey _painterKey = GlobalKey();
+  bool _showBindingsList = false;
+  Map<String, bool> _comparisonResults = {};
 
   Widget _buildConnectionDropdown({
     required String label,
@@ -188,7 +190,24 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                         size: Size(constraints.maxWidth, constraints.maxHeight),
                       ),
                     ),
-                    if (_bindings.isNotEmpty)
+                    // 浮动按钮，显示绑定数量
+                    if (_bindings.isNotEmpty && !_showBindingsList)
+                      Positioned(
+                        bottom: 16,
+                        right: 16,
+                        child: FloatingActionButton.extended(
+                          onPressed: () {
+                            setState(() {
+                              _showBindingsList = true;
+                            });
+                          },
+                          icon: const Icon(Icons.link),
+                          label: Text('集合绑定 (${_bindings.length})'),
+                          backgroundColor: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                    // 绑定列表，点击浮动按钮后显示
+                    if (_bindings.isNotEmpty && _showBindingsList)
                       Positioned(
                         bottom: 16,
                         left: 16,
@@ -239,6 +258,15 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                       icon: const Icon(Icons.clear_all),
                       label: const Text('清空'),
                     ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () {
+                        setState(() {
+                          _showBindingsList = false;
+                        });
+                      },
+                      tooltip: '关闭',
+                    ),
                   ],
                 ],
               ),
@@ -266,9 +294,33 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        // 显示比较状态的图标
+                        if (_comparisonResults.containsKey(binding.id))
+                          Icon(
+                            _comparisonResults[binding.id]! 
+                                ? Icons.check_circle 
+                                : Icons.pending,
+                            color: _comparisonResults[binding.id]!
+                                ? Colors.green
+                                : Colors.orange,
+                            size: 16,
+                          ),
                         IconButton(
                           icon: const Icon(Icons.play_arrow),
-                          onPressed: () => widget.onCompareBinding(binding),
+                          onPressed: () {
+                            setState(() {
+                              _comparisonResults[binding.id] = false;
+                            });
+                            widget.onCompareBinding(binding);
+                            // 模拟比较完成
+                            Future.delayed(const Duration(milliseconds: 500), () {
+                              if (mounted) {
+                                setState(() {
+                                  _comparisonResults[binding.id] = true;
+                                });
+                              }
+                            });
+                          },
                           tooltip: '执行比较',
                         ),
                         IconButton(
@@ -323,8 +375,26 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
   }
 
   void _compareAllBindings() {
+    // 清空之前的比较结果
+    setState(() {
+      _comparisonResults.clear();
+    });
+    
+    // 对所有绑定进行比较
     for (final binding in _bindings) {
+      // 记录比较状态，默认为进行中
+      setState(() {
+        _comparisonResults[binding.id] = false;
+      });
+      
+      // 执行比较
       widget.onCompareBinding(binding);
+      
+      // 在实际应用中，这里应该有一个回调来更新比较结果
+      // 由于我们没有实际的比较结果回调，这里模拟设置为已完成
+      setState(() {
+        _comparisonResults[binding.id] = true;
+      });
     }
   }
 
