@@ -116,9 +116,10 @@ class DatabaseCollectionPanelState
     if (_loadingCollections.contains(database)) {
       return; // 避免重复加载
     }
-
-    setState(() {
-      _loadingCollections.add(database);
+    await Future.microtask(() {
+      setState(() {
+        _loadingCollections.add(database);
+      });
     });
 
     try {
@@ -240,20 +241,26 @@ class DatabaseCollectionPanelState
 
         // 为每个数据库项创建并存储GlobalKey
         if (!_nodeKeys.containsKey(database)) {
-          _nodeKeys[database] = ValueKey(database);
+          _nodeKeys[database] = PageStorageKey(database);
         }
 
         return ExpansionTile(
           key: _nodeKeys[database], // 使用存储的GlobalKey
           maintainState: true, // 保持状态
-          leading: Icon(Icons.folder_open), // 使用包含GlobalKey的图标Widget
+          leading: const Icon(Icons.folder_open), // 使用包含GlobalKey的图标Widget
           title: Text(database),
+          // 绑定展开状态
+          initiallyExpanded: _databaseCollapsedState[database] ?? false,
           subtitle: Text('${collections?.length ?? 0} 个集合'),
-          onExpansionChanged: (isExpanded) {
+          onExpansionChanged: (isExpanded) async {
             print(
               'ExpansionTile onExpansionChanged: $database, isExpanded: $isExpanded, collections: $collections',
             );
-            _databaseCollapsedState[database] = !isExpanded;
+            await Future.microtask(() {
+              setState(() {
+                _databaseCollapsedState[database] = !isExpanded;
+              });
+            });
             if (isExpanded &&
                 collections == null &&
                 !_loadingCollections.contains(database)) {
