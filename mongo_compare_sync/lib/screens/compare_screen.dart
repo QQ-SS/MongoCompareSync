@@ -290,32 +290,13 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: _buildConnectionDropdown(
-                  label: '源连接',
-                  selectedConnection: _sourceConnection,
-                  connections: allConnections,
-                  onConnectionChanged: _handleSourceConnectionChanged,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildConnectionDropdown(
-                  label: '目标连接',
-                  selectedConnection: _targetConnection,
-                  connections: allConnections,
-                  onConnectionChanged: _handleTargetConnectionChanged,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
           Expanded(
             child: DragDropCompareView(
+              connections: allConnections,
               sourceConnection: _sourceConnection,
               targetConnection: _targetConnection,
+              onSourceConnectionChanged: _handleSourceConnectionChanged,
+              onTargetConnectionChanged: _handleTargetConnectionChanged,
               onBindingsChanged: _handleBindingsChanged,
               onCompareBinding: _handleCompareBinding,
             ),

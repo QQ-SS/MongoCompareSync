@@ -39,9 +39,11 @@ class DatabaseCollectionPanelState
   bool _isLoading = false;
   String? _error;
   final Map<String, GlobalKey> _collectionKeys = {};
+  final Map<String, GlobalKey> _databaseKeys = {}; // 新增：用于存储数据库的GlobalKey
   final Set<String> _loadingCollections = {};
 
   Map<String, GlobalKey> getCollectionKeys() => _collectionKeys;
+  Map<String, GlobalKey> getDatabaseKeys() => _databaseKeys; // 新增：获取数据库Key的方法
 
   @override
   void initState() {
@@ -165,11 +167,15 @@ class DatabaseCollectionPanelState
         children: [
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             child: Row(
               children: [
-                Icon(_getTypeIcon(), color: _getTypeColor()),
-                const SizedBox(width: 8),
+                SizedBox(
+                  width: 24, // 标准图标宽度
+                  height: 24, // 标准图标高度
+                  child: Icon(_getTypeIcon(), color: _getTypeColor()),
+                ),
+                const SizedBox(width: 32), // 与ListTile的默认间距对齐
                 Expanded(
                   child: Text(
                     '${_getTypeDisplayName()}集合: ${widget.connection?.name ?? "未选择"}',
@@ -229,8 +235,17 @@ class DatabaseCollectionPanelState
         final database = entry.key;
         final collections = entry.value;
 
+        // 为每个数据库项创建并存储GlobalKey
+        if (!_databaseKeys.containsKey(database)) {
+          _databaseKeys[database] = GlobalKey();
+        }
+
         return ExpansionTile(
-          leading: const Icon(Icons.folder_open),
+          key: _databaseKeys[database], // 使用存储的GlobalKey
+          maintainState: true, // 保持状态
+          leading: const Icon(
+            Icons.folder_open,
+          ), // 默认图标大小24x24，ExpansionTile会处理对齐
           title: Text(database),
           subtitle: Text('${collections?.length ?? 0} 个集合'),
           onExpansionChanged: (isExpanded) {
@@ -376,8 +391,8 @@ class DatabaseCollectionPanelState
 
     return Container(
       key: _collectionKeys[key],
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      margin: const EdgeInsets.symmetric(vertical: 2, horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.symmetric(vertical: 2),
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: BorderRadius.circular(8),
@@ -385,12 +400,12 @@ class DatabaseCollectionPanelState
       ),
       child: Row(
         children: [
-          Icon(
-            Icons.table_chart,
-            size: 16,
-            color: textColor ?? _getTypeColor(),
+          SizedBox(
+            width: 24, // 标准图标宽度
+            height: 24, // 标准图标高度
+            child: Icon(Icons.table_chart, color: textColor ?? _getTypeColor()),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 32), // 与ListTile的默认间距对齐
           Expanded(
             child: Text(
               collection,
