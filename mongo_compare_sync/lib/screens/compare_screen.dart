@@ -7,7 +7,8 @@ import '../models/document.dart';
 import '../models/compare_rule.dart';
 import '../providers/connection_provider.dart' hide ConnectionState;
 import '../providers/rule_provider.dart';
-import '../widgets/database_browser.dart'; // Now DatabaseTreeView
+import '../widgets/database_browser.dart';
+import '../widgets/drag_drop_compare_view.dart';
 import '../widgets/responsive_layout.dart';
 import '../widgets/loading_indicator.dart';
 import '../widgets/skeleton_loader.dart';
@@ -15,7 +16,7 @@ import '../services/platform_service.dart';
 import '../services/log_service.dart';
 import 'comparison_result_screen.dart';
 import 'rule_list_screen.dart';
-import '../repositories/connection_repository.dart'; // Import ConnectionRepository
+import '../repositories/connection_repository.dart';
 
 class CompareScreen extends ConsumerStatefulWidget {
   const CompareScreen({super.key});
@@ -36,32 +37,17 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
   List<DocumentDiff>? _comparisonResults;
   CompareRule? _selectedRule;
 
+  List<CollectionBinding> _dragDropBindings = [];
+
   @override
   void initState() {
     super.initState();
-    // 获取已保存的连接
     _loadConnections();
   }
 
-  @override
-  void dispose() {
-    super.dispose();
-  }
-
   void _loadConnections() {
-    final connectionsState = ref.read(connectionsProvider);
-    connectionsState.whenData((connections) {
-      if (connections.isNotEmpty) {
-        setState(() {
-          _sourceConnection = connections.first;
-        });
-        if (connections.length > 1) {
-          setState(() {
-            _targetConnection = connections[1];
-          });
-        }
-      }
-    });
+    // 不自动设置连接，让用户手动选择
+    // 这样可以避免使用过期的连接ID
   }
 
   void _handleSourceConnectionChanged(MongoConnection? connection) {
@@ -94,92 +80,18 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
     });
   }
 
-  // 构建比较结果预览
-  Widget _buildComparisonResultPreview(
-    PlatformService platformService,
-    double spacing,
-  ) {
-    if (_comparisonResults == null || _comparisonResults!.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    final totalDiffs = _comparisonResults!.length;
-    final addedCount = _comparisonResults!
-        .where((diff) => diff.status == 'added')
-        .length;
-    final removedCount = _comparisonResults!
-        .where((diff) => diff.status == 'removed')
-        .length;
-    final modifiedCount = _comparisonResults!
-        .where((diff) => diff.status == 'modified')
-        .length;
-
-    return Card(
-      elevation: platformService.getPlatformElevation(),
-      margin: EdgeInsets.symmetric(vertical: spacing),
-      child: Padding(
-        padding: EdgeInsets.all(spacing),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.compare_arrows,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                const SizedBox(width: 8),
-                Text('比较结果摘要', style: Theme.of(context).textTheme.titleMedium),
-                const Spacer(),
-                TextButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => ComparisonResultScreen(
-                          results: _comparisonResults!,
-                          sourceCollection:
-                              '$_sourceDatabase.$_sourceCollection',
-                          targetCollection:
-                              '$_targetDatabase.$_targetCollection',
-                        ),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.visibility),
-                  label: const Text('查看详情'),
-                ),
-              ],
-            ),
-            const Divider(),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildStatItem('总差异', totalDiffs, Colors.blue),
-                _buildStatItem('新增', addedCount, Colors.green),
-                _buildStatItem('删除', removedCount, Colors.red),
-                _buildStatItem('修改', modifiedCount, Colors.amber),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
+  void _handleBindingsChanged(List<CollectionBinding> bindings) {
+    setState(() {
+      _dragDropBindings = bindings;
+    });
   }
 
-  // 构建统计项
-  Widget _buildStatItem(String label, int count, Color color) {
-    return Column(
-      children: [
-        Text(
-          count.toString(),
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-        Text(label),
-      ],
+  void _handleCompareBinding(CollectionBinding binding) {
+    _compareSpecificCollections(
+      binding.sourceDatabase,
+      binding.sourceCollection,
+      binding.targetDatabase,
+      binding.targetCollection,
     );
   }
 
@@ -196,6 +108,27 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
       return;
     }
 
+    await _compareSpecificCollections(
+      _sourceDatabase!,
+      _sourceCollection!,
+      _targetDatabase!,
+      _targetCollection!,
+    );
+  }
+
+  Future<void> _compareSpecificCollections(
+    String sourceDatabase,
+    String sourceCollection,
+    String targetDatabase,
+    String targetCollection,
+  ) async {
+    if (_sourceConnection == null || _targetConnection == null) {
+      setState(() {
+        _error = '请选择源和目标连接';
+      });
+      return;
+    }
+
     setState(() {
       _isComparing = true;
       _error = null;
@@ -206,11 +139,11 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
       final mongoService = ref.read(mongoServiceProvider);
       final results = await mongoService.compareCollections(
         _sourceConnection!.id,
-        _sourceDatabase!,
-        _sourceCollection!,
+        sourceDatabase,
+        sourceCollection,
         _targetConnection!.id,
-        _targetDatabase!,
-        _targetCollection!,
+        targetDatabase,
+        targetCollection,
         fieldRules: _selectedRule?.fieldRules,
       );
 
@@ -219,19 +152,17 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
         _isComparing = false;
       });
 
-      // 导航到比较结果界面
       if (results.isNotEmpty) {
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (context) => ComparisonResultScreen(
               results: results,
-              sourceCollection: '$_sourceDatabase.$_sourceCollection',
-              targetCollection: '$_targetDatabase.$_targetCollection',
+              sourceCollection: '$sourceDatabase.$sourceCollection',
+              targetCollection: '$targetDatabase.$targetCollection',
             ),
           ),
         );
       } else {
-        // 如果没有差异，显示提示
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('没有发现差异')));
@@ -248,9 +179,6 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
   @override
   Widget build(BuildContext context) {
     final connectionsState = ref.watch(connectionsProvider);
-    final platformService = PlatformService.instance;
-    final isSmallScreen = ResponsiveLayoutUtil.isSmallScreen(context);
-    final spacing = ResponsiveLayoutUtil.getResponsiveSpacing(context);
 
     return connectionsState.when(
       data: (connections) {
@@ -280,10 +208,9 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                   const SizedBox(height: 24),
                   ElevatedButton.icon(
                     onPressed: () {
-                      Navigator.of(context).pushNamedAndRemoveUntil(
-                        '/', // 主页路由
-                        (route) => false, // 移除所有路由
-                      );
+                      Navigator.of(
+                        context,
+                      ).pushNamedAndRemoveUntil('/', (route) => false);
                     },
                     icon: const Icon(Icons.link),
                     label: const Text('前往连接管理'),
@@ -294,24 +221,9 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
           );
         }
 
-        // 响应式布局
-        return ResponsiveLayout(
-          // 小屏幕布局 - 垂直排列
-          small: _buildSmallScreenLayout(
-            allConnections,
-            platformService,
-            spacing,
-          ),
-
-          // 中等屏幕和大屏幕布局 - 水平排列
-          medium: _buildLargeScreenLayout(
-            allConnections,
-            platformService,
-            spacing,
-          ),
-
-          // 大屏幕布局与中等屏幕相同，但可能有不同的间距
-          large: null,
+        return Scaffold(
+          appBar: AppBar(title: const Text('集合比较')),
+          body: _buildDragDropCompareView(allConnections),
         );
       },
       loading: () => Scaffold(
@@ -330,9 +242,7 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
         ),
       ),
       error: (err, stackTrace) {
-        // 记录错误
         LogService.instance.error('Failed to load connections', err);
-
         return Scaffold(
           body: Center(
             child: Column(
@@ -375,597 +285,42 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
     );
   }
 
-  // 小屏幕布局
-  Widget _buildSmallScreenLayout(
-    List<MongoConnection> allConnections,
-    PlatformService platformService,
-    double spacing,
-  ) {
-    return Scaffold(
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: EdgeInsets.all(spacing),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+  Widget _buildDragDropCompareView(List<MongoConnection> allConnections) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          Row(
             children: [
-              // 源连接选择
-              _buildConnectionDropdown(
-                label: '源连接',
-                selectedConnection: _sourceConnection,
-                connections: allConnections,
-                onConnectionChanged: _handleSourceConnectionChanged,
-              ),
-              SizedBox(height: spacing),
-
-              // 源数据库和集合树形视图
-              Card(
-                elevation: platformService.getPlatformElevation(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: EdgeInsets.all(spacing),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              '源集合: ${_sourceConnection?.name ?? "未选择"} > ${_sourceDatabase ?? "未选择"}',
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                          ),
-                          if (_sourceDatabase != null &&
-                              _sourceCollection != null)
-                            Chip(
-                              label: Text(
-                                '$_sourceDatabase.$_sourceCollection',
-                              ),
-                              backgroundColor: Theme.of(
-                                context,
-                              ).colorScheme.primaryContainer,
-                              labelStyle: TextStyle(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onPrimaryContainer,
-                                fontSize: 12,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    const Divider(height: 1),
-                    SizedBox(
-                      height: 200,
-                      child: _sourceConnection == null
-                          ? const Center(child: Text('请选择源数据库连接'))
-                          : DatabaseTreeView(
-                              connection: _sourceConnection,
-                              onDatabaseSelected: (dbName) {
-                                WidgetsBinding.instance.addPostFrameCallback((
-                                  _,
-                                ) {
-                                  setState(() {
-                                    _sourceDatabase = dbName;
-                                    _sourceCollection = null;
-                                  });
-                                });
-                              },
-                              onCollectionSelected:
-                                  _handleSourceCollectionSelected,
-                              selectedDatabase: _sourceDatabase,
-                              selectedCollection: _sourceCollection,
-                              isSource: true,
-                            ),
-                    ),
-                  ],
+              Expanded(
+                child: _buildConnectionDropdown(
+                  label: '源连接',
+                  selectedConnection: _sourceConnection,
+                  connections: allConnections,
+                  onConnectionChanged: _handleSourceConnectionChanged,
                 ),
               ),
-              SizedBox(height: spacing),
-
-              // 目标连接选择
-              _buildConnectionDropdown(
-                label: '目标连接',
-                selectedConnection: _targetConnection,
-                connections: allConnections,
-                onConnectionChanged: _handleTargetConnectionChanged,
-              ),
-              SizedBox(height: spacing),
-
-              // 目标数据库和集合树形视图
-              Card(
-                elevation: platformService.getPlatformElevation(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: EdgeInsets.all(spacing),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              '目标集合: ${_targetConnection?.name ?? "未选择"} > ${_targetDatabase ?? "未选择"}',
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                          ),
-                          if (_targetDatabase != null &&
-                              _targetCollection != null)
-                            Chip(
-                              label: Text(
-                                '$_targetDatabase.$_targetCollection',
-                              ),
-                              backgroundColor: Theme.of(
-                                context,
-                              ).colorScheme.secondaryContainer,
-                              labelStyle: TextStyle(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSecondaryContainer,
-                                fontSize: 12,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    const Divider(height: 1),
-                    SizedBox(
-                      height: 200,
-                      child: _targetConnection == null
-                          ? const Center(child: Text('请选择目标数据库连接'))
-                          : DatabaseTreeView(
-                              connection: _targetConnection,
-                              onDatabaseSelected: (dbName) {
-                                WidgetsBinding.instance.addPostFrameCallback((
-                                  _,
-                                ) {
-                                  setState(() {
-                                    _targetDatabase = dbName;
-                                    _targetCollection = null;
-                                  });
-                                });
-                              },
-                              onCollectionSelected:
-                                  _handleTargetCollectionSelected,
-                              selectedDatabase: _targetDatabase,
-                              selectedCollection: _targetCollection,
-                              isSource: false,
-                            ),
-                    ),
-                  ],
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildConnectionDropdown(
+                  label: '目标连接',
+                  selectedConnection: _targetConnection,
+                  connections: allConnections,
+                  onConnectionChanged: _handleTargetConnectionChanged,
                 ),
               ),
-              SizedBox(height: spacing),
-
-              // 比较规则选择区域
-              Card(
-                elevation: platformService.getPlatformElevation(),
-                child: Padding(
-                  padding: EdgeInsets.all(spacing),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '比较规则:',
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                      SizedBox(height: spacing / 2),
-                      _buildRuleSelector(),
-                      SizedBox(height: spacing / 2),
-                      Center(
-                        child: TextButton.icon(
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) => const RuleListScreen(),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.rule),
-                          label: const Text('管理规则'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              SizedBox(height: spacing),
-
-              // 比较操作区域
-              Card(
-                elevation: platformService.getPlatformElevation(),
-                child: Padding(
-                  padding: EdgeInsets.all(spacing),
-                  child: Column(
-                    children: [
-                      // 比较按钮
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: _isComparing
-                              ? null
-                              : (_sourceCollection != null &&
-                                    _targetCollection != null)
-                              ? _compareCollections
-                              : null,
-                          icon: _isComparing
-                              ? SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onPrimary,
-                                  ),
-                                )
-                              : const Icon(Icons.compare_arrows),
-                          label: Text(_isComparing ? '正在比较...' : '比较集合'),
-                        ),
-                      ),
-
-                      // 选择状态提示
-                      if (_sourceCollection == null ||
-                          _targetCollection == null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text(
-                            '请先选择源和目标集合',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.outline,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // 错误信息
-              if (_error != null)
-                Card(
-                  elevation: platformService.getPlatformElevation(),
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.errorContainer.withOpacity(0.2),
-                  margin: EdgeInsets.symmetric(vertical: spacing),
-                  child: Padding(
-                    padding: EdgeInsets.all(spacing),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.error_outline,
-                              color: Theme.of(context).colorScheme.error,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '错误',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.error,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _error!,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.error,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-              // 比较结果预览
-              if (_comparisonResults != null && _comparisonResults!.isNotEmpty)
-                _buildComparisonResultPreview(platformService, spacing),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  // 大屏幕布局
-  Widget _buildLargeScreenLayout(
-    List<MongoConnection> allConnections,
-    PlatformService platformService,
-    double spacing,
-  ) {
-    return Scaffold(
-      body: Padding(
-        padding: EdgeInsets.all(spacing),
-        child: Column(
-          children: [
-            // 连接选择区域
-            Row(
-              children: [
-                Expanded(
-                  child: _buildConnectionDropdown(
-                    label: '源连接',
-                    selectedConnection: _sourceConnection,
-                    connections: allConnections,
-                    onConnectionChanged: _handleSourceConnectionChanged,
-                  ),
-                ),
-                SizedBox(width: spacing),
-                Expanded(
-                  child: _buildConnectionDropdown(
-                    label: '目标连接',
-                    selectedConnection: _targetConnection,
-                    connections: allConnections,
-                    onConnectionChanged: _handleTargetConnectionChanged,
-                  ),
-                ),
-              ],
+          const SizedBox(height: 16),
+          Expanded(
+            child: DragDropCompareView(
+              sourceConnection: _sourceConnection,
+              targetConnection: _targetConnection,
+              onBindingsChanged: _handleBindingsChanged,
+              onCompareBinding: _handleCompareBinding,
             ),
-            SizedBox(height: spacing),
-
-            // 数据库浏览器区域
-            Expanded(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // 源集合浏览器
-                  Expanded(
-                    child: Card(
-                      elevation: platformService.getPlatformElevation(),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: EdgeInsets.all(spacing),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    '源集合: ${_sourceConnection?.name ?? "未选择"} > ${_sourceDatabase ?? "未选择"}',
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.titleMedium,
-                                  ),
-                                ),
-                                if (_sourceDatabase != null &&
-                                    _sourceCollection != null)
-                                  Chip(
-                                    label: Text(
-                                      '$_sourceDatabase.$_sourceCollection',
-                                    ),
-                                    backgroundColor: Theme.of(
-                                      context,
-                                    ).colorScheme.primaryContainer,
-                                    labelStyle: TextStyle(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onPrimaryContainer,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                          const Divider(height: 1),
-                          Expanded(
-                            child: _sourceConnection == null
-                                ? const Center(child: Text('请选择源数据库连接'))
-                                : DatabaseTreeView(
-                                    connection: _sourceConnection,
-                                    onDatabaseSelected: (dbName) {
-                                      WidgetsBinding.instance
-                                          .addPostFrameCallback((_) {
-                                            setState(() {
-                                              _sourceDatabase = dbName;
-                                              _sourceCollection = null;
-                                            });
-                                          });
-                                    },
-                                    onCollectionSelected:
-                                        _handleSourceCollectionSelected,
-                                    selectedDatabase: _sourceDatabase,
-                                    selectedCollection: _sourceCollection,
-                                    isSource: true,
-                                  ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: spacing),
-
-                  // 目标集合浏览器
-                  Expanded(
-                    child: Card(
-                      elevation: platformService.getPlatformElevation(),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: EdgeInsets.all(spacing),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    '目标集合: ${_targetConnection?.name ?? "未选择"} > ${_targetDatabase ?? "未选择"}',
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.titleMedium,
-                                  ),
-                                ),
-                                if (_targetDatabase != null &&
-                                    _targetCollection != null)
-                                  Chip(
-                                    label: Text(
-                                      '$_targetDatabase.$_targetCollection',
-                                    ),
-                                    backgroundColor: Theme.of(
-                                      context,
-                                    ).colorScheme.secondaryContainer,
-                                    labelStyle: TextStyle(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSecondaryContainer,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                          const Divider(height: 1),
-                          Expanded(
-                            child: _targetConnection == null
-                                ? const Center(child: Text('请选择目标数据库连接'))
-                                : DatabaseTreeView(
-                                    connection: _targetConnection,
-                                    onDatabaseSelected: (dbName) {
-                                      WidgetsBinding.instance
-                                          .addPostFrameCallback((_) {
-                                            setState(() {
-                                              _targetDatabase = dbName;
-                                              _targetCollection = null;
-                                            });
-                                          });
-                                    },
-                                    onCollectionSelected:
-                                        _handleTargetCollectionSelected,
-                                    selectedDatabase: _targetDatabase,
-                                    selectedCollection: _targetCollection,
-                                    isSource: false,
-                                  ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: spacing),
-
-            // 底部操作区域
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 比较规则选择区域
-                Expanded(
-                  child: Card(
-                    elevation: platformService.getPlatformElevation(),
-                    child: Padding(
-                      padding: EdgeInsets.all(spacing),
-                      child: Row(
-                        children: [
-                          Text(
-                            '比较规则:',
-                            style: Theme.of(context).textTheme.titleSmall,
-                          ),
-                          SizedBox(width: spacing),
-                          Expanded(child: _buildRuleSelector()),
-                          SizedBox(width: spacing),
-                          TextButton.icon(
-                            onPressed: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) => const RuleListScreen(),
-                                ),
-                              );
-                            },
-                            icon: const Icon(Icons.rule),
-                            label: const Text('管理规则'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-
-                SizedBox(width: spacing),
-
-                // 比较操作区域
-                Card(
-                  elevation: platformService.getPlatformElevation(),
-                  child: Padding(
-                    padding: EdgeInsets.all(spacing),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        ElevatedButton.icon(
-                          onPressed: _isComparing
-                              ? null
-                              : (_sourceCollection != null &&
-                                    _targetCollection != null)
-                              ? _compareCollections
-                              : null,
-                          icon: _isComparing
-                              ? SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onPrimary,
-                                  ),
-                                )
-                              : const Icon(Icons.compare_arrows),
-                          label: Text(_isComparing ? '正在比较...' : '比较集合'),
-                        ),
-
-                        if (_sourceCollection == null ||
-                            _targetCollection == null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Text(
-                              '请先选择源和目标集合',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.outline,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            // 错误信息
-            if (_error != null)
-              Card(
-                elevation: platformService.getPlatformElevation(),
-                color: Theme.of(
-                  context,
-                ).colorScheme.errorContainer.withOpacity(0.2),
-                margin: EdgeInsets.only(top: spacing),
-                child: Padding(
-                  padding: EdgeInsets.all(spacing),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.error_outline,
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _error!,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.error,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-            // 比较结果预览
-            if (_comparisonResults != null && _comparisonResults!.isNotEmpty)
-              _buildComparisonResultPreview(platformService, spacing),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -976,14 +331,12 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
     required List<MongoConnection> connections,
     required Function(MongoConnection?) onConnectionChanged,
   }) {
-    // 确保连接ID唯一性
     final uniqueConnections = <String, MongoConnection>{};
     for (final conn in connections) {
       uniqueConnections[conn.id] = conn;
     }
     final uniqueConnectionsList = uniqueConnections.values.toList();
 
-    // 检查当前选中的连接是否存在于唯一连接列表中
     final selectedConnectionExists = selectedConnection == null
         ? false
         : uniqueConnections.containsKey(selectedConnection.id);
@@ -1019,52 +372,6 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
           },
         ),
       ],
-    );
-  }
-
-  Widget _buildRuleSelector() {
-    final rules = ref.watch(rulesProvider);
-
-    // 确保规则ID唯一性
-    final uniqueRules = <String, CompareRule>{};
-    for (final rule in rules) {
-      uniqueRules[rule.id] = rule;
-    }
-    final uniqueRulesList = uniqueRules.values.toList();
-
-    // 检查当前选中的规则是否存在于唯一规则列表中
-    final selectedRuleExists = _selectedRule == null
-        ? false
-        : uniqueRules.containsKey(_selectedRule!.id);
-
-    return DropdownButtonFormField<String?>(
-      value: selectedRuleExists ? _selectedRule?.id : null,
-      decoration: InputDecoration(
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-        hintText: '选择比较规则（可选）',
-      ),
-      items: [
-        const DropdownMenuItem<String?>(value: null, child: Text('不使用规则')),
-        ...uniqueRulesList.map((rule) {
-          return DropdownMenuItem<String?>(
-            value: rule.id,
-            child: Text(rule.name),
-          );
-        }),
-      ],
-      onChanged: (value) {
-        setState(() {
-          if (value == null) {
-            _selectedRule = null;
-          } else {
-            _selectedRule = uniqueRulesList.firstWhere(
-              (rule) => rule.id == value,
-              orElse: () => uniqueRulesList.first,
-            );
-          }
-        });
-      },
     );
   }
 }
