@@ -119,28 +119,28 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
       child: Column(
         children: [
           Row(
-              children: [
-                Flexible(
-                  flex: 2,
-                                      child: _buildConnectionDropdown(
-                      label: '源连接',
-                      selectedConnection: widget.sourceConnection,
-                      connections: widget.connections,
-                      onConnectionChanged: widget.onSourceConnectionChanged,
-                                      ),
+            children: [
+              Flexible(
+                flex: 2,
+                child: _buildConnectionDropdown(
+                  label: '源连接',
+                  selectedConnection: widget.sourceConnection,
+                  connections: widget.connections,
+                  onConnectionChanged: widget.onSourceConnectionChanged,
                 ),
-                const Spacer(flex: 1),
-                Flexible(
-                  flex: 2,
-                                      child: _buildConnectionDropdown(
-                      label: '目标连接',
-                      selectedConnection: widget.targetConnection,
-                      connections: widget.connections,
-                      onConnectionChanged: widget.onTargetConnectionChanged,
-                                      ),
+              ),
+              const Spacer(flex: 1),
+              Flexible(
+                flex: 2,
+                child: _buildConnectionDropdown(
+                  label: '目标连接',
+                  selectedConnection: widget.targetConnection,
+                  connections: widget.connections,
+                  onConnectionChanged: widget.onTargetConnectionChanged,
                 ),
-              ],
-                      ),
+              ),
+            ],
+          ),
           const SizedBox(height: 16),
           Expanded(
             child: LayoutBuilder(
@@ -178,10 +178,8 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                         key: _painterKey,
                         painter: ConnectionLinePainter(
                           bindings: _bindings,
-                          sourceCollectionKeys: _getSourceCollectionKeys(),
-                          targetCollectionKeys: _getTargetCollectionKeys(),
-                          sourceDatabaseKeys: _getSourceDatabaseKeys(),
-                          targetDatabaseKeys: _getTargetDatabaseKeys(),
+                          sourceKey: _sourceKey,
+                          targetKey: _targetKey,
                           context: context,
                           painterRenderBox:
                               _painterKey.currentContext?.findRenderObject()
@@ -206,15 +204,6 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
       ),
     );
   }
-
-  Map<String, GlobalKey> _getSourceCollectionKeys() =>
-      _sourceKey.currentState?.getCollectionKeys() ?? {};
-  Map<String, GlobalKey> _getTargetCollectionKeys() =>
-      _targetKey.currentState?.getCollectionKeys() ?? {};
-  Map<String, GlobalKey> _getSourceDatabaseKeys() =>
-      _sourceKey.currentState?.getDatabaseKeys() ?? {};
-  Map<String, GlobalKey> _getTargetDatabaseKeys() =>
-      _targetKey.currentState?.getDatabaseKeys() ?? {};
 
   Widget _buildBindingsList() {
     return Card(
@@ -358,19 +347,15 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
 
 class ConnectionLinePainter extends CustomPainter {
   final List<CollectionBinding> bindings;
-  final Map<String, GlobalKey> sourceCollectionKeys;
-  final Map<String, GlobalKey> targetCollectionKeys;
-  final Map<String, GlobalKey> sourceDatabaseKeys;
-  final Map<String, GlobalKey> targetDatabaseKeys;
+  final GlobalKey<DatabaseCollectionPanelState> sourceKey;
+  final GlobalKey<DatabaseCollectionPanelState> targetKey;
   final BuildContext context;
   final RenderBox? painterRenderBox;
 
   ConnectionLinePainter({
     required this.bindings,
-    required this.sourceCollectionKeys,
-    required this.targetCollectionKeys,
-    required this.sourceDatabaseKeys,
-    required this.targetDatabaseKeys,
+    required this.sourceKey,
+    required this.targetKey,
     required this.context,
     this.painterRenderBox,
   });
@@ -383,39 +368,54 @@ class ConnectionLinePainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
 
     if (painterRenderBox == null) {
+      print('ConnectionLinePainter: painterRenderBox is null');
       return;
     }
 
-    for (final binding in bindings) {
-      final sourceCollectionKey =
-          '${binding.sourceDatabase}_${binding.sourceCollection}';
-      final targetCollectionKey =
-          '${binding.targetDatabase}_${binding.targetCollection}';
-      RenderBox? sourceRenderBox =
-          sourceCollectionKeys[sourceCollectionKey]?.currentContext
-                  ?.findRenderObject()
-              as RenderBox?;
-      RenderBox? targetRenderBox =
-          targetCollectionKeys[targetCollectionKey]?.currentContext
-                  ?.findRenderObject()
-              as RenderBox?;
+    print('ConnectionLinePainter: 开始绘制连接线，共有 ${bindings.length} 个绑定');
 
-      if (sourceRenderBox == null) {
-        sourceRenderBox =
-            sourceDatabaseKeys[binding.sourceDatabase]?.currentContext
-                    ?.findRenderObject()
-                as RenderBox?;
-      }
-      if (targetRenderBox == null) {
-        targetRenderBox =
-            targetDatabaseKeys[binding.targetDatabase]?.currentContext
-                    ?.findRenderObject()
-                as RenderBox?;
-      }
+    for (final binding in bindings) {
+      print(
+        'ConnectionLinePainter: 处理绑定 ${binding.sourceDatabase}.${binding.sourceCollection} -> ${binding.targetDatabase}.${binding.targetCollection}',
+      );
+
+      // 修改key的格式，使用 数据库名.集合名 作为key
+      final sourceCollectionKey =
+          '${binding.sourceDatabase}.${binding.sourceCollection}';
+      final targetCollectionKey =
+          '${binding.targetDatabase}.${binding.targetCollection}';
+
+      final isSourceDatabaseCollapsed =
+          sourceKey.currentState?.isDatabaseCollapsed(binding.sourceDatabase) ??
+          true;
+      final isTargetDatabaseCollapsed =
+          targetKey.currentState?.isDatabaseCollapsed(binding.targetDatabase) ??
+          true;
+
+      // 获取ValueKey对应的BuildContext
+      final sourceContext = _findContextForKey(
+        sourceKey.currentState?.nodeKeys[isSourceDatabaseCollapsed
+            ? binding.sourceDatabase
+            : sourceCollectionKey],
+      );
+      final targetContext = _findContextForKey(
+        targetKey.currentState?.nodeKeys[isTargetDatabaseCollapsed
+            ? binding.targetDatabase
+            : targetCollectionKey],
+      );
+
+      // 从BuildContext获取RenderBox
+      RenderBox? sourceRenderBox =
+          sourceContext?.findRenderObject() as RenderBox?;
+      RenderBox? targetRenderBox =
+          targetContext?.findRenderObject() as RenderBox?;
 
       if (sourceRenderBox != null && targetRenderBox != null) {
+        // 获取全局位置
         final sourceGlobalPosition = sourceRenderBox.localToGlobal(Offset.zero);
         final targetGlobalPosition = targetRenderBox.localToGlobal(Offset.zero);
+
+        // 转换为画布的本地坐标
         final sourceLocalPosition = painterRenderBox!.globalToLocal(
           sourceGlobalPosition,
         );
@@ -423,25 +423,76 @@ class ConnectionLinePainter extends CustomPainter {
           targetGlobalPosition,
         );
 
-        final sourceCenter = Offset(
+        // 计算连接线的起点和终点
+        Offset sourceCenter;
+        Offset targetCenter;
+
+        sourceCenter = Offset(
           sourceLocalPosition.dx + sourceRenderBox.size.width,
           sourceLocalPosition.dy + sourceRenderBox.size.height / 2,
         );
-        final targetCenter = Offset(
+
+        // 根据是否为数据库级别调整连接点位置
+        if (isSourceDatabaseCollapsed) {
+          // 如果是数据库级别（收缩状态），连接到ExpansionTile的右侧
+          // sourceCenter = Offset(
+          //   sourceLocalPosition.dx +
+          //       sourceRenderBox.size.width -
+          //       16, // 右侧留出一些边距
+          //   sourceLocalPosition.dy + 24, // ExpansionTile标题的高度约为48，取中点
+          // );
+          print('ConnectionLinePainter: 使用 数据库项 位置作为源连接点: $sourceCenter');
+        } else {
+          // 如果是集合级别（展开状态），连接到集合项的右侧
+          // sourceCenter = Offset(
+          //   sourceLocalPosition.dx + sourceRenderBox.size.width,
+          //   sourceLocalPosition.dy + sourceRenderBox.size.height / 2,
+          // );
+          print('ConnectionLinePainter: 使用 集合项 位置作为源连接点: $sourceCenter');
+        }
+
+        targetCenter = Offset(
           targetLocalPosition.dx,
           targetLocalPosition.dy + targetRenderBox.size.height / 2,
         );
+        if (isTargetDatabaseCollapsed) {
+          // 如果是数据库级别（收缩状态），直接使用固定位置
+          // 获取目标数据库项的宽度，用于计算
+          // final dbWidth = targetRenderBox.size.width;
+          // final dbHeight = targetRenderBox.size.height;
 
+          // print('ConnectionLinePainter: 目标数据库项宽度: $dbWidth, 高度: $dbHeight');
+
+          // // 硬编码连接到数据库项的图标位置
+          // targetCenter = Offset(
+          //   targetLocalPosition.dx + 40, // 进一步调整水平位置
+          //   targetLocalPosition.dy + 24, // 保持垂直位置不变
+          // );
+
+          print('ConnectionLinePainter: 使用 数据库项 位置作为目标连接点: $targetCenter');
+        } else {
+          // 如果是集合级别（展开状态），连接到集合项的左侧
+          // targetCenter = Offset(
+          //   targetLocalPosition.dx,
+          //   targetLocalPosition.dy + targetRenderBox.size.height / 2,
+          // );
+          print('ConnectionLinePainter: 使用 集合项 位置作为目标连接点: $targetCenter');
+        }
+
+        // 绘制贝塞尔曲线
         final path = Path();
         path.moveTo(sourceCenter.dx, sourceCenter.dy);
+
         final controlPoint1 = Offset(
           sourceCenter.dx + (targetCenter.dx - sourceCenter.dx) * 0.5,
           sourceCenter.dy,
         );
+
         final controlPoint2 = Offset(
           sourceCenter.dx + (targetCenter.dx - sourceCenter.dx) * 0.5,
           targetCenter.dy,
         );
+
         path.cubicTo(
           controlPoint1.dx,
           controlPoint1.dy,
@@ -450,9 +501,31 @@ class ConnectionLinePainter extends CustomPainter {
           targetCenter.dx,
           targetCenter.dy,
         );
+
         canvas.drawPath(path, paint);
       }
     }
+  }
+
+  // 辅助方法：从ValueKey获取BuildContext
+  BuildContext? _findContextForKey(ValueKey? key) {
+    if (key == null) return null;
+
+    // 使用Element.visitChildElements递归查找具有指定key的元素
+    BuildContext? result;
+
+    void visitor(Element element) {
+      if (element.widget.key == key) {
+        result = element;
+        return;
+      }
+      element.visitChildren(visitor);
+    }
+
+    // 从根元素开始访问
+    (context as Element).visitChildElements(visitor);
+
+    return result;
   }
 
   @override

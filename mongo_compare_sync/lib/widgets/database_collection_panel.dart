@@ -38,12 +38,17 @@ class DatabaseCollectionPanelState
   Map<String, List<String>?> _databases = {};
   bool _isLoading = false;
   String? _error;
-  final Map<String, GlobalKey> _collectionKeys = {};
-  final Map<String, GlobalKey> _databaseKeys = {}; // 新增：用于存储数据库的GlobalKey
+  final Map<String, ValueKey> _nodeKeys = {};
   final Set<String> _loadingCollections = {};
+  // 存储数据库的收缩状态，true表示收缩，false表示展开
+  final Map<String, bool> _databaseCollapsedState = {};
 
-  Map<String, GlobalKey> getCollectionKeys() => _collectionKeys;
-  Map<String, GlobalKey> getDatabaseKeys() => _databaseKeys; // 新增：获取数据库Key的方法
+  Map<String, ValueKey> get nodeKeys => _nodeKeys;
+  Map<String, ValueKey> getNodeKeys() => _nodeKeys;
+
+  // 判断数据库是否处于收缩状态
+  bool isDatabaseCollapsed(String database) =>
+      _databaseCollapsedState[database] ?? true;
 
   @override
   void initState() {
@@ -156,8 +161,6 @@ class DatabaseCollectionPanelState
         : Theme.of(context).colorScheme.secondary;
   }
 
-  Map<String, GlobalKey> get collectionKeys => _collectionKeys;
-
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -236,22 +239,21 @@ class DatabaseCollectionPanelState
         final collections = entry.value;
 
         // 为每个数据库项创建并存储GlobalKey
-        if (!_databaseKeys.containsKey(database)) {
-          _databaseKeys[database] = GlobalKey();
+        if (!_nodeKeys.containsKey(database)) {
+          _nodeKeys[database] = ValueKey(database);
         }
 
         return ExpansionTile(
-          key: _databaseKeys[database], // 使用存储的GlobalKey
+          key: _nodeKeys[database], // 使用存储的GlobalKey
           maintainState: true, // 保持状态
-          leading: const Icon(
-            Icons.folder_open,
-          ), // 默认图标大小24x24，ExpansionTile会处理对齐
+          leading: Icon(Icons.folder_open), // 使用包含GlobalKey的图标Widget
           title: Text(database),
           subtitle: Text('${collections?.length ?? 0} 个集合'),
           onExpansionChanged: (isExpanded) {
             print(
               'ExpansionTile onExpansionChanged: $database, isExpanded: $isExpanded, collections: $collections',
             );
+            _databaseCollapsedState[database] = !isExpanded;
             if (isExpanded &&
                 collections == null &&
                 !_loadingCollections.contains(database)) {
@@ -282,9 +284,10 @@ class DatabaseCollectionPanelState
   }
 
   Widget _buildCollectionItem(String database, String collection) {
-    final key = '${database}_$collection';
-    if (!_collectionKeys.containsKey(key)) {
-      _collectionKeys[key] = GlobalKey();
+    // 修改key的命名方式，使用 数据库名.集合名 作为key
+    final key = '$database.$collection';
+    if (!_nodeKeys.containsKey(key)) {
+      _nodeKeys[key] = ValueKey(key);
     }
 
     final isBound = widget.onBindingCheck(database, collection);
@@ -390,7 +393,7 @@ class DatabaseCollectionPanelState
     }
 
     return Container(
-      key: _collectionKeys[key],
+      key: _nodeKeys[key],
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       margin: const EdgeInsets.symmetric(vertical: 2),
       decoration: BoxDecoration(
