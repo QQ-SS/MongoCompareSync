@@ -50,6 +50,64 @@ class DatabaseCollectionPanelState
   bool isDatabaseCollapsed(String database) =>
       _databaseCollapsedState[database] ?? true;
 
+  // 展开指定数据库
+  void expandDatabase(String database) {
+    if (_databaseCollapsedState[database] ?? true) {
+      setState(() {
+        _databaseCollapsedState[database] = false;
+      });
+
+      // 如果集合尚未加载，则加载集合
+      if (_databases.containsKey(database) && _databases[database] == null) {
+        _loadCollections(database);
+      }
+    }
+  }
+
+  // 滚动到指定集合
+  void scrollToCollection(String database, String collection) {
+    // 确保数据库已展开
+    expandDatabase(database);
+
+    // 获取集合的key
+    final collectionKey = '$database.$collection';
+    final valueKey = _nodeKeys[collectionKey];
+
+    if (valueKey != null) {
+      // 使用延迟确保UI已更新
+      Future.delayed(const Duration(milliseconds: 100), () {
+        // 查找具有该key的BuildContext
+        BuildContext? context = _findContextForKey(valueKey);
+        if (context != null) {
+          Scrollable.ensureVisible(
+            context,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            alignment: 0.5, // 居中显示
+          );
+        }
+      });
+    }
+  }
+
+  // 查找具有指定key的BuildContext
+  BuildContext? _findContextForKey(ValueKey key) {
+    BuildContext? result;
+
+    void visitor(Element element) {
+      if (element.widget.key == key) {
+        result = element;
+        return;
+      }
+      element.visitChildren(visitor);
+    }
+
+    // 从当前上下文开始访问
+    (context as Element).visitChildElements(visitor);
+
+    return result;
+  }
+
   @override
   void initState() {
     super.initState();

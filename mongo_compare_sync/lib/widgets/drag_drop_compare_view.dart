@@ -193,25 +193,30 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                     // 浮动按钮，显示绑定数量
                     if (_bindings.isNotEmpty && !_showBindingsList)
                       Positioned(
-                        bottom: 16,
+                        bottom: 32,
                         right: 16,
-                        child: FloatingActionButton.extended(
-                          onPressed: () {
-                            setState(() {
-                              _showBindingsList = true;
-                            });
-                          },
-                          icon: const Icon(Icons.link),
-                          label: Text('集合绑定 (${_bindings.length})'),
-                          backgroundColor: Theme.of(
-                            context,
-                          ).colorScheme.primary,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            FloatingActionButton.extended(
+                              onPressed: () {
+                                setState(() {
+                                  _showBindingsList = true;
+                                });
+                              },
+                              icon: const Icon(Icons.link),
+                              label: Text(' ${_bindings.length}'),
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.primary,
+                            ),
+                          ],
                         ),
                       ),
                     // 绑定列表，点击浮动按钮后显示
                     if (_bindings.isNotEmpty && _showBindingsList)
                       Positioned(
-                        bottom: 16,
+                        bottom: 32,
                         left: 16,
                         right: 16,
                         child: _buildBindingsList(),
@@ -333,6 +338,13 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                           onPressed: () => _removeBinding(binding),
                           tooltip: '删除绑定',
                         ),
+                        // 添加滚动到可见区域的按钮
+                        IconButton(
+                          icon: const Icon(Icons.visibility),
+                          iconSize: 20,
+                          onPressed: () => _scrollBindingToVisible(binding),
+                          tooltip: '滚动到可见区域',
+                        ),
                       ],
                     ),
                   );
@@ -401,6 +413,44 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
         _comparisonResults[binding.id] = true;
       });
     }
+  }
+
+  // 滚动单个绑定到可见区域
+  void _scrollBindingToVisible(CollectionBinding binding) {
+    // 确保源面板和目标面板的状态都存在
+    final sourceState = _sourceKey.currentState;
+    final targetState = _targetKey.currentState;
+
+    if (sourceState == null || targetState == null) return;
+
+    // 展开源数据库并滚动到源集合
+    sourceState.expandDatabase(binding.sourceDatabase);
+    sourceState.scrollToCollection(
+      binding.sourceDatabase,
+      binding.sourceCollection,
+    );
+
+    // 展开目标数据库并滚动到目标集合
+    targetState.expandDatabase(binding.targetDatabase);
+    targetState.scrollToCollection(
+      binding.targetDatabase,
+      binding.targetCollection,
+    );
+
+    // 显示一个短暂的提示
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('已滚动到绑定的集合'),
+        duration: Duration(milliseconds: 500),
+      ),
+    );
+
+    // // 如果绑定列表是打开的，关闭它以便更好地查看集合
+    // if (_showBindingsList) {
+    //   setState(() {
+    //     _showBindingsList = false;
+    //   });
+    // }
   }
 
   bool _isSourceBound(String database, String collection) {
