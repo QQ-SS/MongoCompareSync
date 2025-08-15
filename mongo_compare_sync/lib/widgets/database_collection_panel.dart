@@ -30,17 +30,18 @@ class DatabaseCollectionPanel extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<DatabaseCollectionPanel> createState() =>
-      _DatabaseCollectionPanelState();
+  DatabaseCollectionPanelState createState() => DatabaseCollectionPanelState();
 }
 
-class _DatabaseCollectionPanelState
+class DatabaseCollectionPanelState
     extends ConsumerState<DatabaseCollectionPanel> {
   Map<String, List<String>?> _databases = {};
   bool _isLoading = false;
   String? _error;
   final Map<String, GlobalKey> _collectionKeys = {};
   final Set<String> _loadingCollections = {};
+
+  Map<String, GlobalKey> getCollectionKeys() => _collectionKeys;
 
   @override
   void initState() {

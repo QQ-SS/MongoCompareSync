@@ -52,8 +52,8 @@ class DragDropCompareView extends ConsumerStatefulWidget {
 class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
     with TickerProviderStateMixin {
   final List<CollectionBinding> _bindings = [];
-  final GlobalKey _sourceKey = GlobalKey();
-  final GlobalKey _targetKey = GlobalKey();
+  final GlobalKey<DatabaseCollectionPanelState> _sourceKey = GlobalKey();
+  final GlobalKey<DatabaseCollectionPanelState> _targetKey = GlobalKey();
 
   @override
   Widget build(BuildContext context) {
@@ -63,31 +63,37 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
           children: [
             // 主要内容
             Positioned.fill(
-              child: Row(
-                children: [
-                  // 源集合面板
-                  Expanded(
-                    child: DatabaseCollectionPanel(
-                      key: _sourceKey,
-                      connection: widget.sourceConnection,
-                      type: PanelType.source,
-                      onBindingCheck: _isSourceBound,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24.0,
+                ), // 增加左右内边距
+                child: Row(
+                  children: [
+                    // 源集合面板
+                    Flexible(
+                      flex: 2, // 调整比例，让面板更小
+                      child: DatabaseCollectionPanel(
+                        key: _sourceKey,
+                        connection: widget.sourceConnection,
+                        type: PanelType.source,
+                        onBindingCheck: _isSourceBound,
+                      ),
                     ),
-                  ),
 
-                  const SizedBox(width: 16),
-
-                  // 目标集合面板
-                  Expanded(
-                    child: DatabaseCollectionPanel(
-                      key: _targetKey,
-                      connection: widget.targetConnection,
-                      type: PanelType.target,
-                      onDragAccept: _createBinding,
-                      onBindingCheck: _isTargetBound,
+                    const Spacer(flex: 1), // 增加左右面板间距，并分散排列
+                    // 目标集合面板
+                    Flexible(
+                      flex: 2, // 调整比例，让面板更小
+                      child: DatabaseCollectionPanel(
+                        key: _targetKey,
+                        connection: widget.targetConnection,
+                        type: PanelType.target,
+                        onDragAccept: _createBinding,
+                        onBindingCheck: _isTargetBound,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
 
@@ -120,19 +126,11 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
   }
 
   Map<String, GlobalKey> _getSourceKeys() {
-    final sourceState = _sourceKey.currentState;
-    if (sourceState is DatabaseCollectionPanel) {
-      return (sourceState as dynamic).collectionKeys ?? {};
-    }
-    return {};
+    return _sourceKey.currentState?.getCollectionKeys() ?? {};
   }
 
   Map<String, GlobalKey> _getTargetKeys() {
-    final targetState = _targetKey.currentState;
-    if (targetState is DatabaseCollectionPanel) {
-      return (targetState as dynamic).collectionKeys ?? {};
-    }
-    return {};
+    return _targetKey.currentState?.getCollectionKeys() ?? {};
   }
 
   Widget _buildBindingsList() {
@@ -312,17 +310,35 @@ class ConnectionLinePainter extends CustomPainter {
             targetGlobalKey!.currentContext!.findRenderObject() as RenderBox?;
 
         if (sourceRenderBox != null && targetRenderBox != null) {
-          final sourcePosition = sourceRenderBox.localToGlobal(Offset.zero);
-          final targetPosition = targetRenderBox.localToGlobal(Offset.zero);
+          // 获取 CustomPaint 自身的 RenderBox
+          final RenderBox painterRenderBox =
+              context.findRenderObject() as RenderBox;
 
+          // 获取集合项的全局位置
+          final sourceGlobalPosition = sourceRenderBox.localToGlobal(
+            Offset.zero,
+          );
+          final targetGlobalPosition = targetRenderBox.localToGlobal(
+            Offset.zero,
+          );
+
+          // 将全局位置转换为 CustomPaint 的局部位置
+          final sourceLocalPosition = painterRenderBox.globalToLocal(
+            sourceGlobalPosition,
+          );
+          final targetLocalPosition = painterRenderBox.globalToLocal(
+            targetGlobalPosition,
+          );
+
+          // 计算连接点（相对于 CustomPaint 的 Canvas）
           final sourceCenter = Offset(
-            sourcePosition.dx + sourceRenderBox.size.width,
-            sourcePosition.dy + sourceRenderBox.size.height / 2,
+            sourceLocalPosition.dx + sourceRenderBox.size.width, // 源容器的右边缘
+            sourceLocalPosition.dy + sourceRenderBox.size.height / 2,
           );
 
           final targetCenter = Offset(
-            targetPosition.dx,
-            targetPosition.dy + targetRenderBox.size.height / 2,
+            targetLocalPosition.dx, // 目标容器的左边缘
+            targetLocalPosition.dy + targetRenderBox.size.height / 2,
           );
 
           // 绘制贝塞尔曲线
@@ -348,31 +364,9 @@ class ConnectionLinePainter extends CustomPainter {
           );
 
           canvas.drawPath(path, paint);
-
-          // 绘制箭头
-          _drawArrow(canvas, paint, targetCenter, sourceCenter);
         }
       }
     }
-  }
-
-  void _drawArrow(Canvas canvas, Paint paint, Offset target, Offset source) {
-    const arrowSize = 8.0;
-    final direction = (target - source).direction;
-
-    final arrowPath = Path();
-    arrowPath.moveTo(target.dx, target.dy);
-    arrowPath.lineTo(
-      target.dx - arrowSize * math.cos(direction - math.pi / 6),
-      target.dy - arrowSize * math.sin(direction - math.pi / 6),
-    );
-    arrowPath.moveTo(target.dx, target.dy);
-    arrowPath.lineTo(
-      target.dx - arrowSize * math.cos(direction + math.pi / 6),
-      target.dy - arrowSize * math.sin(direction + math.pi / 6),
-    );
-
-    canvas.drawPath(arrowPath, paint);
   }
 
   @override
