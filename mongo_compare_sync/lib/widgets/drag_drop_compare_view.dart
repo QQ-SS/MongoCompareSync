@@ -203,7 +203,9 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                           },
                           icon: const Icon(Icons.link),
                           label: Text('集合绑定 (${_bindings.length})'),
-                          backgroundColor: Theme.of(context).colorScheme.primary,
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.primary,
                         ),
                       ),
                     // 绑定列表，点击浮动按钮后显示
@@ -297,8 +299,8 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                         // 显示比较状态的图标
                         if (_comparisonResults.containsKey(binding.id))
                           Icon(
-                            _comparisonResults[binding.id]! 
-                                ? Icons.check_circle 
+                            _comparisonResults[binding.id]!
+                                ? Icons.check_circle
                                 : Icons.pending,
                             color: _comparisonResults[binding.id]!
                                 ? Colors.green
@@ -313,13 +315,16 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                             });
                             widget.onCompareBinding(binding);
                             // 模拟比较完成
-                            Future.delayed(const Duration(milliseconds: 500), () {
-                              if (mounted) {
-                                setState(() {
-                                  _comparisonResults[binding.id] = true;
-                                });
-                              }
-                            });
+                            Future.delayed(
+                              const Duration(milliseconds: 500),
+                              () {
+                                if (mounted) {
+                                  setState(() {
+                                    _comparisonResults[binding.id] = true;
+                                  });
+                                }
+                              },
+                            );
                           },
                           tooltip: '执行比较',
                         ),
@@ -379,17 +384,17 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
     setState(() {
       _comparisonResults.clear();
     });
-    
+
     // 对所有绑定进行比较
     for (final binding in _bindings) {
       // 记录比较状态，默认为进行中
       setState(() {
         _comparisonResults[binding.id] = false;
       });
-      
+
       // 执行比较
       widget.onCompareBinding(binding);
-      
+
       // 在实际应用中，这里应该有一个回调来更新比较结果
       // 由于我们没有实际的比较结果回调，这里模拟设置为已完成
       setState(() {
@@ -467,11 +472,13 @@ class ConnectionLinePainter extends CustomPainter {
         sourceKey.currentState?.nodeKeys[isSourceDatabaseCollapsed
             ? binding.sourceDatabase
             : sourceCollectionKey],
+        PanelType.source,
       );
       final targetContext = _findContextForKey(
         targetKey.currentState?.nodeKeys[isTargetDatabaseCollapsed
             ? binding.targetDatabase
             : targetCollectionKey],
+        PanelType.target,
       );
 
       // 从BuildContext获取RenderBox
@@ -578,13 +585,19 @@ class ConnectionLinePainter extends CustomPainter {
   }
 
   // 辅助方法：从ValueKey获取BuildContext
-  BuildContext? _findContextForKey(ValueKey? key) {
+  BuildContext? _findContextForKey(ValueKey? key, PanelType type) {
     if (key == null) return null;
 
     // 使用Element.visitChildElements递归查找具有指定key的元素
     BuildContext? result;
 
     void visitor(Element element) {
+      if (element.widget is DatabaseCollectionPanel) {
+        if ((element.widget as DatabaseCollectionPanel).type == type) {
+          element.visitChildren(visitor);
+        }
+        return;
+      }
       if (element.widget.key == key) {
         result = element;
         return;
