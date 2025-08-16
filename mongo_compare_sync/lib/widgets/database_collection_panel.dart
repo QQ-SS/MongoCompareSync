@@ -309,7 +309,9 @@ class DatabaseCollectionPanelState
           title: Text(database),
           // 绑定展开状态
           initiallyExpanded: _databaseCollapsedState[database] ?? false,
-          subtitle: Text('${collections?.length ?? 0} 个集合'),
+          subtitle: collections == null
+              ? null // 当集合未加载时不显示副标题
+              : Text('${collections.length} 个集合'),
           onExpansionChanged: (isExpanded) async {
             print(
               'ExpansionTile onExpansionChanged: $database, isExpanded: $isExpanded, collections: $collections',
