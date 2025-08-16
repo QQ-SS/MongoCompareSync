@@ -1021,7 +1021,58 @@ class _DocumentTreeComparisonScreenState
       return;
     }
 
-    final targetDoc = _targetDocuments[docId];
+    // 获取目标文档数据
+    Map<String, dynamic>? targetDoc = _targetDocuments[docId];
+
+    // 如果本地没有缓存目标文档数据，尝试从数据库加载
+    if (targetDoc == null) {
+      try {
+        // 获取文档差异信息
+        final diff = widget.results.firstWhere(
+          (d) => d.sourceDocument.id == docId,
+          orElse: () => throw Exception('未找到文档差异信息'),
+        );
+
+        if (diff.targetDocument == null) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('目标文档不存在')));
+          return;
+        }
+
+        // 处理ID格式
+        String cleanId = docId;
+        if (docId.startsWith('ObjectId("') && docId.endsWith('")')) {
+          cleanId = docId.substring(10, docId.length - 2);
+        }
+
+        // 尝试从数据库加载目标文档
+        final docs = await widget.mongoService.getDocuments(
+          widget.targetConnectionId!,
+          diff.targetDocument!.databaseName,
+          diff.targetDocument!.collectionName,
+          query: {'_id': ObjectId.parse(cleanId)},
+        );
+
+        if (docs.isEmpty) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('无法从数据库加载目标文档')));
+          return;
+        }
+
+        // 使用从数据库加载的文档
+        targetDoc = docs.first.data;
+        // 更新本地缓存
+        _targetDocuments[docId] = targetDoc;
+      } catch (e) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('加载目标文档失败: $e')));
+        return;
+      }
+    }
+
     if (targetDoc == null) {
       ScaffoldMessenger.of(
         context,
@@ -1074,7 +1125,29 @@ class _DocumentTreeComparisonScreenState
 
       // 更新本地数据
       setState(() {
-        _sourceDocuments[docId] = Map<String, dynamic>.from(targetDoc);
+        _sourceDocuments[docId] = Map<String, dynamic>.from(targetDoc!);
+
+        // 更新文档差异状态
+        for (int i = 0; i < widget.results.length; i++) {
+          if (widget.results[i].sourceDocument.id == docId) {
+            // 如果是已删除文档（源中不存在），则更新差异类型为已修改
+            if (widget.results[i].diffType == DocumentDiffType.removed) {
+              widget.results[i] = DocumentDiff(
+                sourceDocument: MongoDocument(
+                  id: docId,
+                  data: Map<String, dynamic>.from(targetDoc),
+                  collectionName: widget.sourceCollection,
+                  databaseName: widget.results[i].sourceDocument.databaseName,
+                  connectionId: widget.sourceConnectionId ?? '',
+                ),
+                targetDocument: widget.results[i].targetDocument,
+                diffType: DocumentDiffType.modified,
+                fieldDiffs: {}, // 复制后字段差异为空
+              );
+            }
+            break;
+          }
+        }
       });
 
       ScaffoldMessenger.of(
@@ -1267,6 +1340,29 @@ class _DocumentTreeComparisonScreenState
       // 更新本地数据
       setState(() {
         _targetDocuments[docId] = Map<String, dynamic>.from(sourceDoc);
+
+        // 更新文档差异状态
+        for (int i = 0; i < widget.results.length; i++) {
+          if (widget.results[i].sourceDocument.id == docId) {
+            // 如果是新增文档（目标中不存在），则更新差异类型为已修改
+            if (widget.results[i].diffType == DocumentDiffType.added) {
+              widget.results[i] = DocumentDiff(
+                sourceDocument: widget.results[i].sourceDocument,
+                targetDocument: MongoDocument(
+                  id: docId,
+                  data: Map<String, dynamic>.from(sourceDoc),
+                  collectionName: widget.targetCollection,
+                  databaseName:
+                      widget.results[i].targetDocument?.databaseName ?? '',
+                  connectionId: widget.targetConnectionId ?? '',
+                ),
+                diffType: DocumentDiffType.modified,
+                fieldDiffs: {}, // 复制后字段差异为空
+              );
+            }
+            break;
+          }
+        }
       });
 
       ScaffoldMessenger.of(
