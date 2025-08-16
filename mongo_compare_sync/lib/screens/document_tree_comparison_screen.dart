@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:mongo_dart/mongo_dart.dart';
+import 'package:mongo_dart/mongo_dart.dart' hide Center;
 import '../models/document.dart';
 import '../services/mongo_service.dart';
 import '../models/collection_compare_result.dart';
@@ -928,8 +928,180 @@ class _DocumentTreeComparisonScreenState
   }
 
   // 复制文档到源
-  Future<void> _copyDocumentToSource() async {
-    // 实现复制文档到源的逻辑
+  Future<void> _copyDocumentToSource(String docId) async {
+    if (widget.sourceConnectionId == null ||
+        widget.targetConnectionId == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('连接ID不可用')));
+      return;
+    }
+
+    final targetDoc = _targetDocuments[docId];
+    if (targetDoc == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('目标文档数据不可用')));
+      return;
+    }
+
+    // 确认对话框
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认操作'),
+        content: Text('确定要将文档 $docId 从目标复制到源吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _isProcessing = true;
+      _processingMessage = '正在复制文档...';
+    });
+
+    try {
+      // 获取源文档的数据库和集合名称
+      final diff = widget.results.firstWhere(
+        (d) => d.sourceDocument.id == docId,
+      );
+      final sourceDb = diff.sourceDocument.databaseName;
+      final sourceColl = diff.sourceDocument.collectionName;
+
+      // 复制文档
+      await widget.mongoService.updateDocument(
+        widget.sourceConnectionId!,
+        sourceDb,
+        sourceColl,
+        ObjectId.parse(docId),
+        targetDoc,
+      );
+
+      // 更新本地数据
+      setState(() {
+        _sourceDocuments[docId] = Map<String, dynamic>.from(targetDoc);
+      });
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('文档已成功复制到源')));
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('复制失败: $e')));
+    } finally {
+      setState(() {
+        _isProcessing = false;
+      });
+    }
+  }
+
+  // 复制字段到源
+  Future<void> _copyFieldToSource(String docId, String fieldPath) async {
+    if (widget.sourceConnectionId == null ||
+        widget.targetConnectionId == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('连接ID不可用')));
+      return;
+    }
+
+    final sourceDoc = _sourceDocuments[docId];
+    final targetDoc = _targetDocuments[docId];
+    if (sourceDoc == null || targetDoc == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('文档数据不可用')));
+      return;
+    }
+
+    // 获取字段值
+    final fieldValue = _getNestedValue(targetDoc, fieldPath.split('.'));
+    if (fieldValue == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('字段值不可用')));
+      return;
+    }
+
+    // 确认对话框
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认操作'),
+        content: Text('确定要将字段 $fieldPath 从目标复制到源吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _isProcessing = true;
+      _processingMessage = '正在复制字段...';
+    });
+
+    try {
+      // 获取源文档的数据库和集合名称
+      final diff = widget.results.firstWhere(
+        (d) => d.sourceDocument.id == docId,
+      );
+      final sourceDb = diff.sourceDocument.databaseName;
+      final sourceColl = diff.sourceDocument.collectionName;
+
+      // 更新字段
+      // 获取完整文档并更新特定字段
+      final updatedDoc = Map<String, dynamic>.from(sourceDoc);
+      _setNestedValue(updatedDoc, fieldPath.split('.'), fieldValue);
+
+      // 使用updateDocument方法更新整个文档
+      await widget.mongoService.updateDocument(
+        widget.sourceConnectionId!,
+        sourceDb,
+        sourceColl,
+        ObjectId.parse(docId),
+        updatedDoc,
+      );
+
+      // 更新本地数据
+      final updatedSourceDoc = Map<String, dynamic>.from(sourceDoc);
+      _setNestedValue(updatedSourceDoc, fieldPath.split('.'), fieldValue);
+      setState(() {
+        _sourceDocuments[docId] = updatedSourceDoc;
+      });
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('字段已成功复制到源')));
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('复制失败: $e')));
+    } finally {
+      setState(() {
+        _isProcessing = false;
+      });
+    }
   }
 
   // 复制文档到目标
@@ -958,4 +1130,564 @@ class _DocumentTreeComparisonScreenState
         content: Text('确定要将文档 $docId 从源复制到目标吗？'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _isProcessing = true;
+      _processingMessage = '正在复制文档...';
+    });
+
+    try {
+      // 获取目标文档的数据库和集合名称
+      final diff = widget.results.firstWhere(
+        (d) => d.sourceDocument.id == docId,
+      );
+      final targetDb = diff.targetDocument?.databaseName ?? '';
+      final targetColl = diff.targetDocument?.collectionName ?? '';
+
+      if (targetDb.isEmpty || targetColl.isEmpty) {
+        throw Exception('目标数据库或集合名称不可用');
+      }
+
+      // 复制文档 - 使用insertDocument或updateDocument
+      try {
+        // 先尝试更新文档
+        await widget.mongoService.updateDocument(
+          widget.targetConnectionId!,
+          targetDb,
+          targetColl,
+          ObjectId.parse(docId),
+          sourceDoc,
+        );
+      } catch (e) {
+        // 如果更新失败（可能是文档不存在），则尝试插入
+        await widget.mongoService.insertDocument(
+          widget.targetConnectionId!,
+          targetDb,
+          targetColl,
+          sourceDoc,
+        );
+      }
+
+      // 更新本地数据
+      setState(() {
+        _targetDocuments[docId] = Map<String, dynamic>.from(sourceDoc);
+      });
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('文档已成功复制到目标')));
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('复制失败: $e')));
+    } finally {
+      setState(() {
+        _isProcessing = false;
+      });
+    }
+  }
+
+  // 复制字段到目标
+  Future<void> _copyFieldToTarget(String docId, String fieldPath) async {
+    if (widget.sourceConnectionId == null ||
+        widget.targetConnectionId == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('连接ID不可用')));
+      return;
+    }
+
+    final sourceDoc = _sourceDocuments[docId];
+    final targetDoc = _targetDocuments[docId];
+    if (sourceDoc == null || targetDoc == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('文档数据不可用')));
+      return;
+    }
+
+    // 获取字段值
+    final fieldValue = _getNestedValue(sourceDoc, fieldPath.split('.'));
+    if (fieldValue == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('字段值不可用')));
+      return;
+    }
+
+    // 确认对话框
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认操作'),
+        content: Text('确定要将字段 $fieldPath 从源复制到目标吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _isProcessing = true;
+      _processingMessage = '正在复制字段...';
+    });
+
+    try {
+      // 获取目标文档的数据库和集合名称
+      final diff = widget.results.firstWhere(
+        (d) => d.sourceDocument.id == docId,
+      );
+      final targetDb = diff.targetDocument?.databaseName ?? '';
+      final targetColl = diff.targetDocument?.collectionName ?? '';
+
+      if (targetDb.isEmpty || targetColl.isEmpty) {
+        throw Exception('目标数据库或集合名称不可用');
+      }
+
+      // 更新字段 - 获取完整文档并更新特定字段
+      final updatedDoc = Map<String, dynamic>.from(targetDoc);
+      _setNestedValue(updatedDoc, fieldPath.split('.'), fieldValue);
+
+      // 使用updateDocument方法更新整个文档
+      await widget.mongoService.updateDocument(
+        widget.targetConnectionId!,
+        targetDb,
+        targetColl,
+        ObjectId.parse(docId),
+        updatedDoc,
+      );
+
+      // 更新本地数据
+      final updatedTargetDoc = Map<String, dynamic>.from(targetDoc);
+      _setNestedValue(updatedTargetDoc, fieldPath.split('.'), fieldValue);
+      setState(() {
+        _targetDocuments[docId] = updatedTargetDoc;
+      });
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('字段已成功复制到目标')));
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('复制失败: $e')));
+    } finally {
+      setState(() {
+        _isProcessing = false;
+      });
+    }
+  }
+
+  // 删除源文档
+  Future<void> _deleteSourceDocument(String docId) async {
+    if (widget.sourceConnectionId == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('连接ID不可用')));
+      return;
+    }
+
+    // 确认对话框
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认删除'),
+        content: Text('确定要删除源文档 $docId 吗？此操作不可撤销。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _isProcessing = true;
+      _processingMessage = '正在删除文档...';
+    });
+
+    try {
+      // 获取源文档的数据库和集合名称
+      final diff = widget.results.firstWhere(
+        (d) => d.sourceDocument.id == docId,
+      );
+      final sourceDb = diff.sourceDocument.databaseName;
+      final sourceColl = diff.sourceDocument.collectionName;
+
+      // 删除文档
+      await widget.mongoService.deleteDocument(
+        widget.sourceConnectionId!,
+        sourceDb,
+        sourceColl,
+        ObjectId.parse(docId),
+      );
+
+      // 更新本地数据
+      setState(() {
+        _sourceDocuments.remove(docId);
+      });
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('源文档已成功删除')));
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('删除失败: $e')));
+    } finally {
+      setState(() {
+        _isProcessing = false;
+      });
+    }
+  }
+
+  // 删除源字段
+  Future<void> _deleteSourceField(String docId, String fieldPath) async {
+    if (widget.sourceConnectionId == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('连接ID不可用')));
+      return;
+    }
+
+    final sourceDoc = _sourceDocuments[docId];
+    if (sourceDoc == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('源文档数据不可用')));
+      return;
+    }
+
+    // 确认对话框
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认删除'),
+        content: Text('确定要删除源文档中的字段 $fieldPath 吗？此操作不可撤销。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _isProcessing = true;
+      _processingMessage = '正在删除字段...';
+    });
+
+    try {
+      // 获取源文档的数据库和集合名称
+      final diff = widget.results.firstWhere(
+        (d) => d.sourceDocument.id == docId,
+      );
+      final sourceDb = diff.sourceDocument.databaseName;
+      final sourceColl = diff.sourceDocument.collectionName;
+
+      // 删除字段 - 获取完整文档并删除特定字段
+      final docWithDeletedField = Map<String, dynamic>.from(sourceDoc);
+      _deleteNestedValue(docWithDeletedField, fieldPath.split('.'));
+
+      // 使用updateDocument方法更新整个文档
+      await widget.mongoService.updateDocument(
+        widget.sourceConnectionId!,
+        sourceDb,
+        sourceColl,
+        ObjectId.parse(docId),
+        docWithDeletedField,
+      );
+
+      // 更新本地数据
+      final updatedSourceDoc = Map<String, dynamic>.from(sourceDoc);
+      _deleteNestedValue(updatedSourceDoc, fieldPath.split('.'));
+      setState(() {
+        _sourceDocuments[docId] = updatedSourceDoc;
+      });
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('源字段已成功删除')));
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('删除失败: $e')));
+    } finally {
+      setState(() {
+        _isProcessing = false;
+      });
+    }
+  }
+
+  // 删除目标文档
+  Future<void> _deleteTargetDocument(String docId) async {
+    if (widget.targetConnectionId == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('连接ID不可用')));
+      return;
+    }
+
+    // 确认对话框
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认删除'),
+        content: Text('确定要删除目标文档 $docId 吗？此操作不可撤销。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _isProcessing = true;
+      _processingMessage = '正在删除文档...';
+    });
+
+    try {
+      // 获取目标文档的数据库和集合名称
+      final diff = widget.results.firstWhere(
+        (d) => d.sourceDocument.id == docId,
+      );
+      final targetDb = diff.targetDocument?.databaseName ?? '';
+      final targetColl = diff.targetDocument?.collectionName ?? '';
+
+      if (targetDb.isEmpty || targetColl.isEmpty) {
+        throw Exception('目标数据库或集合名称不可用');
+      }
+
+      // 删除文档
+      await widget.mongoService.deleteDocument(
+        widget.targetConnectionId!,
+        targetDb,
+        targetColl,
+        ObjectId.parse(docId),
+      );
+
+      // 更新本地数据
+      setState(() {
+        _targetDocuments.remove(docId);
+      });
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('目标文档已成功删除')));
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('删除失败: $e')));
+    } finally {
+      setState(() {
+        _isProcessing = false;
+      });
+    }
+  }
+
+  // 删除目标字段
+  Future<void> _deleteTargetField(String docId, String fieldPath) async {
+    if (widget.targetConnectionId == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('连接ID不可用')));
+      return;
+    }
+
+    final targetDoc = _targetDocuments[docId];
+    if (targetDoc == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('目标文档数据不可用')));
+      return;
+    }
+
+    // 确认对话框
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认删除'),
+        content: Text('确定要删除目标文档中的字段 $fieldPath 吗？此操作不可撤销。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _isProcessing = true;
+      _processingMessage = '正在删除字段...';
+    });
+
+    try {
+      // 获取目标文档的数据库和集合名称
+      final diff = widget.results.firstWhere(
+        (d) => d.sourceDocument.id == docId,
+      );
+      final targetDb = diff.targetDocument?.databaseName ?? '';
+      final targetColl = diff.targetDocument?.collectionName ?? '';
+
+      if (targetDb.isEmpty || targetColl.isEmpty) {
+        throw Exception('目标数据库或集合名称不可用');
+      }
+
+      // 删除字段 - 获取完整文档并删除特定字段
+      final targetDocWithDeletedField = Map<String, dynamic>.from(targetDoc);
+      _deleteNestedValue(targetDocWithDeletedField, fieldPath.split('.'));
+
+      // 使用updateDocument方法更新整个文档
+      await widget.mongoService.updateDocument(
+        widget.targetConnectionId!,
+        targetDb,
+        targetColl,
+        ObjectId.parse(docId),
+        targetDocWithDeletedField,
+      );
+
+      // 更新本地数据
+      final updatedTargetDoc = Map<String, dynamic>.from(targetDoc);
+      _deleteNestedValue(updatedTargetDoc, fieldPath.split('.'));
+      setState(() {
+        _targetDocuments[docId] = updatedTargetDoc;
+      });
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('目标字段已成功删除')));
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('删除失败: $e')));
+    } finally {
+      setState(() {
+        _isProcessing = false;
+      });
+    }
+  }
+
+  // 获取嵌套字段值
+  dynamic _getNestedValue(Map<String, dynamic> data, List<String> pathParts) {
+    dynamic current = data;
+    for (final part in pathParts) {
+      if (current is! Map) return null;
+      if (!current.containsKey(part)) return null;
+      current = current[part];
+    }
+    return current;
+  }
+
+  // 设置嵌套字段值
+  void _setNestedValue(
+    Map<String, dynamic> data,
+    List<String> pathParts,
+    dynamic value,
+  ) {
+    if (pathParts.isEmpty) return;
+
+    if (pathParts.length == 1) {
+      data[pathParts.first] = value;
+      return;
+    }
+
+    final firstPart = pathParts.first;
+    final remainingParts = pathParts.sublist(1);
+
+    if (!data.containsKey(firstPart) || data[firstPart] is! Map) {
+      data[firstPart] = <String, dynamic>{};
+    }
+
+    _setNestedValue(
+      data[firstPart] as Map<String, dynamic>,
+      remainingParts,
+      value,
+    );
+  }
+
+  // 删除嵌套字段值
+  void _deleteNestedValue(Map<String, dynamic> data, List<String> pathParts) {
+    if (pathParts.isEmpty) return;
+
+    if (pathParts.length == 1) {
+      data.remove(pathParts.first);
+      return;
+    }
+
+    final firstPart = pathParts.first;
+    final remainingParts = pathParts.sublist(1);
+
+    if (data.containsKey(firstPart) && data[firstPart] is Map) {
+      _deleteNestedValue(
+        data[firstPart] as Map<String, dynamic>,
+        remainingParts,
+      );
+    }
+  }
+}

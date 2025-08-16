@@ -5,6 +5,7 @@ import '../models/connection.dart';
 import '../models/document.dart';
 import '../models/collection_compare_result.dart';
 import '../screens/comparison_result_screen.dart';
+import '../screens/document_tree_comparison_screen.dart';
 import '../services/mongo_service.dart';
 import '../widgets/database_collection_panel.dart';
 
@@ -277,6 +278,18 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                   ),
                   const Spacer(),
                   if (_bindings.isNotEmpty) ...[
+                    Tooltip(
+                      message: '将源与目标集合滚动到可见区域',
+                      child: TextButton.icon(
+                        onPressed: () {
+                          if (_bindings.isNotEmpty) {
+                            _scrollBindingToVisible(_bindings.first);
+                          }
+                        },
+                        icon: const Icon(Icons.visibility),
+                        label: const Text('滚动到可见区域'),
+                      ),
+                    ),
                     TextButton.icon(
                       onPressed: _compareAllBindings,
                       icon: const Icon(Icons.play_arrow),
@@ -683,15 +696,17 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
       );
     }
 
-    // 导航到比较结果页面
+    // 导航到比较结果页面 - 使用新的文档树比较界面
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => ComparisonResultScreen(
+        builder: (context) => DocumentTreeComparisonScreen(
           results: diffs,
-          sourceCollection:
-              '${binding.sourceDatabase}.${binding.sourceCollection}',
-          targetCollection:
-              '${binding.targetDatabase}.${binding.targetCollection}',
+          sourceCollection: binding.sourceCollection,
+          targetCollection: binding.targetCollection,
+          mongoService: _mongoService,
+          sourceConnectionId: widget.sourceConnection?.id,
+          targetConnectionId: widget.targetConnection?.id,
+          ignoredFields: [], // 可以从设置中获取忽略字段
         ),
       ),
     );
