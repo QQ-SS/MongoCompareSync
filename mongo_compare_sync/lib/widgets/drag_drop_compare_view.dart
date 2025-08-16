@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mongo_dart/mongo_dart.dart' hide Size;
 import '../models/connection.dart';
 import '../models/document.dart';
 import '../models/collection_compare_result.dart';
@@ -613,18 +614,28 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
           }
         }
 
-        // 创建源文档和目标文档
+        // 创建源文档和目标文档，确保ID是有效的ObjectId格式
+        // 尝试创建一个ObjectId对象来验证格式
+        ObjectId? objectId;
+        try {
+          objectId = ObjectId.parse(id);
+        } catch (e) {
+          print('ID格式无效，无法解析为ObjectId: $id');
+          // 如果无法解析为ObjectId，我们可以创建一个新的ObjectId
+          objectId = ObjectId();
+        }
+
         final sourceDoc = MongoDocument(
-          id: id,
-          data: {'_id': id}, // 这里只有ID，实际数据需要从MongoDB获取
+          id: objectId.toString(),
+          data: {'_id': objectId}, // 使用ObjectId对象
           collectionName: binding.sourceCollection,
           databaseName: binding.sourceDatabase,
           connectionId: widget.sourceConnection?.id ?? 'unknown',
         );
 
         final targetDoc = MongoDocument(
-          id: id,
-          data: {'_id': id}, // 这里只有ID，实际数据需要从MongoDB获取
+          id: objectId.toString(),
+          data: {'_id': objectId}, // 使用ObjectId对象
           collectionName: binding.targetCollection,
           databaseName: binding.targetDatabase,
           connectionId: widget.targetConnection?.id ?? 'unknown',

@@ -79,18 +79,60 @@ class _DocumentTreeComparisonScreenState
             diff.diffType != DocumentDiffType.removed &&
             widget.sourceConnectionId != null) {
           try {
-            // 使用getDocuments方法获取单个文档
-            final docs = await widget.mongoService.getDocuments(
-              widget.sourceConnectionId!,
-              diff.sourceDocument.databaseName,
-              diff.sourceDocument.collectionName,
-              query: {'_id': ObjectId.parse(id)},
-            );
-            if (docs.isNotEmpty) {
-              _sourceDocuments[id] = docs.first.data;
+            // 处理ID格式
+            ObjectId? objectId;
+            String cleanId = id;
+
+            // 检查ID是否已经是ObjectId("...")格式
+            if (id.startsWith('ObjectId("') && id.endsWith('")')) {
+              // 提取引号内的十六进制字符串
+              cleanId = id.substring(10, id.length - 2);
+              print('从ObjectId字符串中提取ID: $cleanId');
+            }
+
+            try {
+              objectId = ObjectId.parse(cleanId);
+              print('成功解析源文档ID为ObjectId: $cleanId');
+            } catch (e) {
+              print('无法将源文档ID解析为ObjectId: $cleanId, 错误: $e');
+              // 如果无法解析为ObjectId，尝试使用字符串ID查询
+              try {
+                final docs = await widget.mongoService.getDocuments(
+                  widget.sourceConnectionId!,
+                  diff.sourceDocument.databaseName,
+                  diff.sourceDocument.collectionName,
+                  query: {'_id': cleanId},
+                );
+                if (docs.isNotEmpty) {
+                  _sourceDocuments[id] = docs.first.data;
+                  print('使用字符串ID成功加载源文档: $cleanId');
+                  continue;
+                }
+              } catch (e2) {
+                print('使用字符串ID查询源文档失败: $cleanId, 错误: $e2');
+              }
+              continue;
+            }
+
+            // 使用ObjectId查询文档
+            try {
+              final docs = await widget.mongoService.getDocuments(
+                widget.sourceConnectionId!,
+                diff.sourceDocument.databaseName,
+                diff.sourceDocument.collectionName,
+                query: {'_id': objectId},
+              );
+              if (docs.isNotEmpty) {
+                _sourceDocuments[id] = docs.first.data;
+                print('成功加载源文档: $id');
+              } else {
+                print('未找到源文档: $id');
+              }
+            } catch (e) {
+              print('加载源文档失败: $id, 错误: $e');
             }
           } catch (e) {
-            print('无法加载源文档 $id: $e');
+            print('处理源文档时出错: $id, 错误: $e');
           }
         }
       }
@@ -103,18 +145,60 @@ class _DocumentTreeComparisonScreenState
             widget.targetConnectionId != null &&
             diff.targetDocument != null) {
           try {
-            // 使用getDocuments方法获取单个文档
-            final docs = await widget.mongoService.getDocuments(
-              widget.targetConnectionId!,
-              diff.targetDocument!.databaseName,
-              diff.targetDocument!.collectionName,
-              query: {'_id': ObjectId.parse(id)},
-            );
-            if (docs.isNotEmpty) {
-              _targetDocuments[id] = docs.first.data;
+            // 处理ID格式
+            ObjectId? objectId;
+            String cleanId = id;
+
+            // 检查ID是否已经是ObjectId("...")格式
+            if (id.startsWith('ObjectId("') && id.endsWith('")')) {
+              // 提取引号内的十六进制字符串
+              cleanId = id.substring(10, id.length - 2);
+              print('从ObjectId字符串中提取目标ID: $cleanId');
+            }
+
+            try {
+              objectId = ObjectId.parse(cleanId);
+              print('成功解析目标文档ID为ObjectId: $cleanId');
+            } catch (e) {
+              print('无法将目标文档ID解析为ObjectId: $cleanId, 错误: $e');
+              // 如果无法解析为ObjectId，尝试使用字符串ID查询
+              try {
+                final docs = await widget.mongoService.getDocuments(
+                  widget.targetConnectionId!,
+                  diff.targetDocument!.databaseName,
+                  diff.targetDocument!.collectionName,
+                  query: {'_id': cleanId},
+                );
+                if (docs.isNotEmpty) {
+                  _targetDocuments[id] = docs.first.data;
+                  print('使用字符串ID成功加载目标文档: $cleanId');
+                  continue;
+                }
+              } catch (e2) {
+                print('使用字符串ID查询目标文档失败: $cleanId, 错误: $e2');
+              }
+              continue;
+            }
+
+            // 使用ObjectId查询文档
+            try {
+              final docs = await widget.mongoService.getDocuments(
+                widget.targetConnectionId!,
+                diff.targetDocument!.databaseName,
+                diff.targetDocument!.collectionName,
+                query: {'_id': objectId},
+              );
+              if (docs.isNotEmpty) {
+                _targetDocuments[id] = docs.first.data;
+                print('成功加载目标文档: $id');
+              } else {
+                print('未找到目标文档: $id');
+              }
+            } catch (e) {
+              print('加载目标文档失败: $id, 错误: $e');
             }
           } catch (e) {
-            print('无法加载目标文档 $id: $e');
+            print('处理目标文档时出错: $id, 错误: $e');
           }
         }
       }
