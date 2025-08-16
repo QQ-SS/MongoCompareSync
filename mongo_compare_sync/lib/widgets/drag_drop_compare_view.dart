@@ -3,7 +3,9 @@ import 'dart:math' as math;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/connection.dart';
 import '../models/document.dart';
+import '../models/collection_compare_result.dart';
 import '../screens/comparison_result_screen.dart';
+import '../services/mongo_service.dart';
 import '../widgets/database_collection_panel.dart';
 
 // 比较结果信息类
@@ -79,6 +81,10 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
   bool _showBindingsList = false;
   // 存储比较结果，包含状态和详细信息
   Map<String, ComparisonResultInfo> _comparisonResults = {};
+  // 存储详细比较结果，用于导航到比较结果页面
+  Map<String, CollectionCompareResult> _detailedResults = {};
+  // MongoDB服务实例
+  final MongoService _mongoService = MongoService();
 
   Widget _buildConnectionDropdown({
     required String label,
@@ -408,6 +414,7 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
       _bindings.remove(binding);
       // 同时移除比较结果
       _comparisonResults.remove(binding.id);
+      _detailedResults.remove(binding.id);
     });
     widget.onBindingsChanged(_bindings);
   }
@@ -416,40 +423,77 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
     setState(() {
       _bindings.clear();
       _comparisonResults.clear();
+      _detailedResults.clear();
     });
     widget.onBindingsChanged(_bindings);
   }
 
   // 比较单个绑定
-  void _compareBinding(CollectionBinding binding) {
+  Future<void> _compareBinding(CollectionBinding binding) async {
     // 设置比较状态为进行中
     setState(() {
       _comparisonResults[binding.id] = ComparisonResultInfo(isCompleted: false);
     });
 
-    // 执行比较
-    widget.onCompareBinding(binding);
+    try {
+      // 执行比较
+      widget.onCompareBinding(binding);
 
-    // 模拟比较完成，生成随机结果
-    Future.delayed(const Duration(milliseconds: 500), () {
+      // 使用新的详细比较算法
+      if (widget.sourceConnection != null && widget.targetConnection != null) {
+        final compareResult = await _mongoService.compareCollectionsDetailed(
+          widget.sourceConnection!.id,
+          binding.sourceDatabase,
+          binding.sourceCollection,
+          widget.targetConnection!.id,
+          binding.targetDatabase,
+          binding.targetCollection,
+          config: CompareConfig(
+            idField: '_id', // 默认使用 _id 字段
+            ignoreFields: [], // 可以从设置中获取忽略字段
+            caseSensitive: true, // 区分大小写
+          ),
+        );
+
+        // 保存详细比较结果
+        _detailedResults[binding.id] = compareResult;
+
+        // 更新比较结果状态
+        if (mounted) {
+          setState(() {
+            _comparisonResults[binding.id] = ComparisonResultInfo(
+              isCompleted: true,
+              sameCount: compareResult.sameDocumentsCount,
+              diffCount:
+                  compareResult.differentDocumentsCount +
+                  compareResult.sourceOnlyIds.length +
+                  compareResult.targetOnlyIds.length,
+            );
+          });
+        }
+      }
+    } catch (e) {
+      // 处理错误
       if (mounted) {
-        // 生成随机的比较结果
-        final random = math.Random();
-        final sameCount = random.nextInt(100) + 10;
-        final diffCount = random.nextInt(20);
-
         setState(() {
           _comparisonResults[binding.id] = ComparisonResultInfo(
             isCompleted: true,
-            sameCount: sameCount,
-            diffCount: diffCount,
+            sameCount: 0,
+            diffCount: 0,
           );
         });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('比较失败: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
-    });
+    }
   }
 
-  void _compareAllBindings() {
+  // 批量比较所有绑定
+  Future<void> _compareAllBindings() async {
     if (_bindings.isEmpty) return;
 
     // 显示一个短暂的提示
@@ -462,110 +506,140 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
 
     // 对所有绑定进行比较
     for (final binding in _bindings) {
-      _compareBinding(binding);
+      await _compareBinding(binding);
+    }
+
+    // 显示比较完成提示
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('批量比较完成'), duration: Duration(seconds: 1)),
+      );
     }
   }
 
   // 导航到比较结果页面
-  void _navigateToComparisonResult(CollectionBinding binding) {
+  Future<void> _navigateToComparisonResult(CollectionBinding binding) async {
     // 如果比较结果尚未完成，先执行比较
     if (!_comparisonResults.containsKey(binding.id) ||
         !_comparisonResults[binding.id]!.isCompleted) {
-      _compareBinding(binding);
+      await _compareBinding(binding);
     }
 
-    // 生成模拟的比较结果数据
-    final random = math.Random();
-    final results = <DocumentDiff>[];
+    // 检查是否有详细比较结果
+    if (!_detailedResults.containsKey(binding.id)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('比较结果不可用，请重新执行比较'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
 
-    // 获取差异数量，如果已有比较结果则使用已有的，否则生成随机数
-    final diffCount = _comparisonResults.containsKey(binding.id)
-        ? _comparisonResults[binding.id]!.diffCount
-        : random.nextInt(20);
+    final compareResult = _detailedResults[binding.id]!;
 
-    // 生成模拟的文档差异
-    for (int i = 0; i < diffCount; i++) {
-      final docId = 'doc_${i + 1}';
-      final fieldDiffs = <FieldDiff>[];
+    // 将详细比较结果转换为DocumentDiff列表
+    final List<DocumentDiff> diffs = [];
 
-      // 随机生成1-5个字段差异
-      final fieldCount = random.nextInt(5) + 1;
-      for (int j = 0; j < fieldCount; j++) {
-        final fieldPath = 'field_${j + 1}';
-        final diffType = random.nextInt(3); // 0: 新增, 1: 删除, 2: 修改
+    // 处理不同的文档
+    for (var entry in compareResult.documentResults.entries) {
+      final id = entry.key;
+      final result = entry.value;
 
-        String status;
-        dynamic sourceValue;
-        dynamic targetValue;
+      if (!result.isIdentical) {
+        // 创建字段差异映射
+        final Map<String, dynamic> fieldDiffs = {};
+        for (var fieldEntry in result.fieldResults.entries) {
+          final fieldPath = fieldEntry.key;
+          final fieldResult = fieldEntry.value;
 
-        switch (diffType) {
-          case 0: // 新增
-            status = 'added';
-            sourceValue = null;
-            targetValue = 'new_value_$j';
-            break;
-          case 1: // 删除
-            status = 'removed';
-            sourceValue = 'old_value_$j';
-            targetValue = null;
-            break;
-          case 2: // 修改
-          default:
-            status = 'modified';
-            sourceValue = 'old_value_$j';
-            targetValue = 'new_value_$j';
-            break;
+          if (!fieldResult.isIdentical) {
+            fieldDiffs[fieldPath] = {
+              'source': fieldResult.sourceValue,
+              'target': fieldResult.targetValue,
+            };
+          }
         }
 
-        fieldDiffs.add(
-          FieldDiff(
-            fieldPath: fieldPath,
-            status: status,
-            sourceValue: sourceValue,
-            targetValue: targetValue,
+        // 创建源文档和目标文档
+        final sourceDoc = MongoDocument(
+          id: id,
+          data: {'_id': id}, // 这里只有ID，实际数据需要从MongoDB获取
+          collectionName: binding.sourceCollection,
+          databaseName: binding.sourceDatabase,
+          connectionId: widget.sourceConnection?.id ?? 'unknown',
+        );
+
+        final targetDoc = MongoDocument(
+          id: id,
+          data: {'_id': id}, // 这里只有ID，实际数据需要从MongoDB获取
+          collectionName: binding.targetCollection,
+          databaseName: binding.targetDatabase,
+          connectionId: widget.targetConnection?.id ?? 'unknown',
+        );
+
+        // 创建文档差异对象
+        diffs.add(
+          DocumentDiff(
+            sourceDocument: sourceDoc,
+            targetDocument: targetDoc,
+            diffType: DocumentDiffType.modified,
+            fieldDiffs: fieldDiffs,
           ),
         );
       }
+    }
 
-      // 创建源文档和目标文档
+    // 处理只在源集合中存在的文档
+    for (var id in compareResult.sourceOnlyIds) {
       final sourceDoc = MongoDocument(
-        id: docId,
-        data: {'_id': docId, 'data': 'source_data_$i'},
+        id: id,
+        data: {'_id': id}, // 这里只有ID，实际数据需要从MongoDB获取
         collectionName: binding.sourceCollection,
         databaseName: binding.sourceDatabase,
         connectionId: widget.sourceConnection?.id ?? 'unknown',
       );
 
       final targetDoc = MongoDocument(
-        id: docId,
-        data: {'_id': docId, 'data': 'target_data_$i'},
+        id: id,
+        data: {}, // 目标中不存在此文档
         collectionName: binding.targetCollection,
         databaseName: binding.targetDatabase,
         connectionId: widget.targetConnection?.id ?? 'unknown',
       );
 
-      // 创建文档差异对象
-      final docDiffType = random.nextInt(3) == 0
-          ? DocumentDiffType.added
-          : (random.nextInt(2) == 0
-                ? DocumentDiffType.removed
-                : DocumentDiffType.modified);
-
-      final Map<String, dynamic> fieldDiffsMap = {};
-      for (var diff in fieldDiffs) {
-        fieldDiffsMap[diff.fieldPath] = {
-          'source': diff.sourceValue,
-          'target': diff.targetValue,
-          'status': diff.status,
-        };
-      }
-
-      results.add(
+      diffs.add(
         DocumentDiff(
           sourceDocument: sourceDoc,
           targetDocument: targetDoc,
-          diffType: docDiffType,
-          fieldDiffs: fieldDiffsMap,
+          diffType: DocumentDiffType.added,
+        ),
+      );
+    }
+
+    // 处理只在目标集合中存在的文档
+    for (var id in compareResult.targetOnlyIds) {
+      final sourceDoc = MongoDocument(
+        id: id,
+        data: {}, // 源中不存在此文档
+        collectionName: binding.sourceCollection,
+        databaseName: binding.sourceDatabase,
+        connectionId: widget.sourceConnection?.id ?? 'unknown',
+      );
+
+      final targetDoc = MongoDocument(
+        id: id,
+        data: {'_id': id}, // 这里只有ID，实际数据需要从MongoDB获取
+        collectionName: binding.targetCollection,
+        databaseName: binding.targetDatabase,
+        connectionId: widget.targetConnection?.id ?? 'unknown',
+      );
+
+      diffs.add(
+        DocumentDiff(
+          sourceDocument: sourceDoc,
+          targetDocument: targetDoc,
+          diffType: DocumentDiffType.removed,
         ),
       );
     }
@@ -574,7 +648,7 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => ComparisonResultScreen(
-          results: results,
+          results: diffs,
           sourceCollection:
               '${binding.sourceDatabase}.${binding.sourceCollection}',
           targetCollection:
