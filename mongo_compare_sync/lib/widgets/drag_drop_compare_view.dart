@@ -441,6 +441,10 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
 
       // 使用新的详细比较算法
       if (widget.sourceConnection != null && widget.targetConnection != null) {
+        // 确保连接已建立
+        await _mongoService.connect(widget.sourceConnection!);
+        await _mongoService.connect(widget.targetConnection!);
+
         final compareResult = await _mongoService.compareCollectionsDetailed(
           widget.sourceConnection!.id,
           binding.sourceDatabase,
@@ -503,6 +507,34 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
         duration: Duration(seconds: 1),
       ),
     );
+
+    // 确保连接已建立
+    if (widget.sourceConnection != null && widget.targetConnection != null) {
+      try {
+        await _mongoService.connect(widget.sourceConnection!);
+        await _mongoService.connect(widget.targetConnection!);
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('连接失败: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('请先选择源连接和目标连接'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+    }
 
     // 对所有绑定进行比较
     for (final binding in _bindings) {
