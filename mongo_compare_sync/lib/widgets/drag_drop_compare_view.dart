@@ -360,6 +360,13 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                             height: 16,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           ),
+                        // 滚动到可见区域按钮
+                        IconButton(
+                          icon: const Icon(Icons.visibility),
+                          iconSize: 20,
+                          onPressed: () => _scrollBindingToVisible(binding),
+                          tooltip: '滚动到可见区域',
+                        ),
                         IconButton(
                           icon: const Icon(Icons.play_arrow),
                           onPressed: () => _compareBinding(binding),
