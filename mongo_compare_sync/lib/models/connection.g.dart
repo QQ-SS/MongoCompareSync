@@ -16,7 +16,8 @@ MongoConnection _$MongoConnectionFromJson(Map<String, dynamic> json) =>
       password: json['password'] as String?,
       authSource: json['authSource'] as String?,
       useSsl: json['useSsl'] as bool?,
-      databases: (json['databases'] as List<dynamic>?)
+      databases:
+          (json['databases'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toList() ??
           const [],

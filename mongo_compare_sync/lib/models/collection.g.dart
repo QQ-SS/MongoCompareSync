@@ -12,7 +12,8 @@ MongoCollection _$MongoCollectionFromJson(Map<String, dynamic> json) =>
       database: json['database'] as String,
       connectionId: json['connectionId'] as String,
       documentCount: (json['documentCount'] as num?)?.toInt() ?? 0,
-      indexes: (json['indexes'] as List<dynamic>?)
+      indexes:
+          (json['indexes'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toList() ??
           const [],

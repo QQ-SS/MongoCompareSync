@@ -5,6 +5,7 @@ import '../models/collection.dart';
 import '../models/document.dart';
 import '../models/sync_result.dart';
 import '../models/compare_rule.dart';
+import '../models/collection_compare_result.dart';
 import 'log_service.dart';
 
 class MongoService {
@@ -531,6 +532,325 @@ class MongoService {
       successCount: successCount,
       failureCount: failureCount,
       errors: errors,
+    );
+  }
+
+  /// 详细比较两个集合中的所有文档
+  ///
+  /// [sourceConnectionId] 源连接ID
+  /// [sourceDatabaseName] 源数据库名称
+  /// [sourceCollectionName] 源集合名称
+  /// [targetConnectionId] 目标连接ID
+  /// [targetDatabaseName] 目标数据库名称
+  /// [targetCollectionName] 目标集合名称
+  /// [config] 比较配置
+  Future<CollectionCompareResult> compareCollectionsDetailed(
+    String sourceConnectionId,
+    String sourceDatabaseName,
+    String sourceCollectionName,
+    String targetConnectionId,
+    String targetDatabaseName,
+    String targetCollectionName, {
+    CompareConfig? config,
+  }) async {
+    try {
+      LogService.instance.info(
+        '开始详细比较集合: $sourceCollectionName 和 $targetCollectionName',
+      );
+
+      // 使用默认配置或提供的配置
+      final compareConfig = config ?? CompareConfig();
+      final idField = compareConfig.idField;
+      final ignoreFields = compareConfig.ignoreFields;
+      final caseSensitive = compareConfig.caseSensitive;
+
+      // 获取源集合和目标集合的所有文档
+      final sourceDocuments = await getDocuments(
+        sourceConnectionId,
+        sourceDatabaseName,
+        sourceCollectionName,
+        limit: 0, // 获取所有文档
+      );
+
+      final targetDocuments = await getDocuments(
+        targetConnectionId,
+        targetDatabaseName,
+        targetCollectionName,
+        limit: 0, // 获取所有文档
+      );
+
+      LogService.instance.info(
+        '获取到源集合文档数: ${sourceDocuments.length}, 目标集合文档数: ${targetDocuments.length}',
+      );
+
+      // 创建文档ID映射，用于快速查找
+      final Map<String, MongoDocument> sourceDocMap = {};
+      final Map<String, MongoDocument> targetDocMap = {};
+
+      // 提取文档ID并创建映射
+      for (var doc in sourceDocuments) {
+        final id = _extractDocumentId(doc.data, idField);
+        if (id != null) {
+          sourceDocMap[id] = doc;
+        }
+      }
+
+      for (var doc in targetDocuments) {
+        final id = _extractDocumentId(doc.data, idField);
+        if (id != null) {
+          targetDocMap[id] = doc;
+        }
+      }
+
+      // 比较结果统计
+      int sameDocumentsCount = 0;
+      int differentDocumentsCount = 0;
+      final List<String> sourceOnlyIds = [];
+      final List<String> targetOnlyIds = [];
+      final Map<String, DocumentCompareResult> documentResults = {};
+
+      // 遍历源文档，与目标文档比较
+      for (var entry in sourceDocMap.entries) {
+        final id = entry.key;
+        final sourceDoc = entry.value;
+
+        if (targetDocMap.containsKey(id)) {
+          // 文档在两边都存在，比较内容
+          final targetDoc = targetDocMap[id]!;
+          final result = _compareDocumentDetailed(
+            sourceDoc.data,
+            targetDoc.data,
+            ignoreFields: ignoreFields,
+            caseSensitive: caseSensitive,
+          );
+
+          documentResults[id] = result;
+
+          if (result.isIdentical) {
+            sameDocumentsCount++;
+          } else {
+            differentDocumentsCount++;
+          }
+
+          // 从目标映射中移除已处理的文档
+          targetDocMap.remove(id);
+        } else {
+          // 文档只在源集合中存在
+          sourceOnlyIds.add(id);
+        }
+      }
+
+      // 剩余的目标文档是只在目标集合中存在的
+      targetOnlyIds.addAll(targetDocMap.keys);
+
+      // 创建并返回比较结果
+      final result = CollectionCompareResult(
+        sameDocumentsCount: sameDocumentsCount,
+        differentDocumentsCount: differentDocumentsCount,
+        sourceOnlyIds: sourceOnlyIds,
+        targetOnlyIds: targetOnlyIds,
+        documentResults: documentResults,
+      );
+
+      LogService.instance.info('集合比较完成: ${result.summary}');
+      return result;
+    } catch (e, stackTrace) {
+      LogService.instance.error('详细比较集合错误: $e', e, stackTrace);
+      rethrow;
+    }
+  }
+
+  /// 从文档中提取ID字段的值
+  String? _extractDocumentId(Map<String, dynamic> doc, String idField) {
+    if (idField == '_id') {
+      return doc['_id'].toString();
+    } else if (doc.containsKey(idField)) {
+      return doc[idField].toString();
+    }
+    return null;
+  }
+
+  /// 详细比较两个文档
+  DocumentCompareResult _compareDocumentDetailed(
+    Map<String, dynamic> sourceDoc,
+    Map<String, dynamic> targetDoc, {
+    List<String>? ignoreFields,
+    bool caseSensitive = true,
+  }) {
+    final Map<String, FieldCompareResult> fieldResults = {};
+    bool isIdentical = true;
+
+    // 创建忽略字段的正则表达式列表
+    final List<RegExp> ignoreRegexps = [];
+    if (ignoreFields != null) {
+      for (var field in ignoreFields) {
+        final pattern = field
+            .replaceAll('.', '\\.')
+            .replaceAll('*', '.*')
+            .replaceAll('?', '.');
+        ignoreRegexps.add(RegExp('^$pattern\$'));
+      }
+    }
+
+    // 递归比较两个Map
+    void compareMaps(
+      Map<String, dynamic> source,
+      Map<String, dynamic> target,
+      String path,
+    ) {
+      final allKeys = {...source.keys, ...target.keys};
+      for (var key in allKeys) {
+        if (key == '_id') continue; // 跳过ID字段
+
+        final currentPath = path.isEmpty ? key : '$path.$key';
+
+        // 检查是否应该忽略此字段
+        if (ignoreRegexps.any((regex) => regex.hasMatch(currentPath))) {
+          continue;
+        }
+
+        final sourceValue = source[key];
+        final targetValue = target[key];
+
+        // 处理字段存在性差异
+        if (source.containsKey(key) && !target.containsKey(key)) {
+          isIdentical = false;
+          fieldResults[currentPath] = FieldCompareResult(
+            isIdentical: false,
+            sourceValue: sourceValue,
+            targetValue: null,
+          );
+        } else if (!source.containsKey(key) && target.containsKey(key)) {
+          isIdentical = false;
+          fieldResults[currentPath] = FieldCompareResult(
+            isIdentical: false,
+            sourceValue: null,
+            targetValue: targetValue,
+          );
+        } else {
+          // 两边都有此字段，比较值
+          if (sourceValue is Map<String, dynamic> &&
+              targetValue is Map<String, dynamic>) {
+            // 递归比较嵌套的Map
+            compareMaps(sourceValue, targetValue, currentPath);
+          } else if (sourceValue is List && targetValue is List) {
+            // 比较列表
+            final listResult = _compareListsDetailed(
+              sourceValue,
+              targetValue,
+              caseSensitive,
+            );
+            if (!listResult.isIdentical) {
+              isIdentical = false;
+              fieldResults[currentPath] = listResult;
+            }
+          } else {
+            // 比较简单值
+            bool valuesEqual;
+            if (!caseSensitive &&
+                sourceValue is String &&
+                targetValue is String) {
+              valuesEqual =
+                  sourceValue.toLowerCase() == targetValue.toLowerCase();
+            } else {
+              valuesEqual = sourceValue == targetValue;
+            }
+
+            if (!valuesEqual) {
+              isIdentical = false;
+              fieldResults[currentPath] = FieldCompareResult(
+                isIdentical: false,
+                sourceValue: sourceValue,
+                targetValue: targetValue,
+              );
+            }
+          }
+        }
+      }
+    }
+
+    // 开始比较
+    compareMaps(sourceDoc, targetDoc, '');
+
+    return DocumentCompareResult(
+      isIdentical: isIdentical,
+      fieldResults: fieldResults,
+    );
+  }
+
+  /// 详细比较两个列表
+  FieldCompareResult _compareListsDetailed(
+    List sourceList,
+    List targetList,
+    bool caseSensitive,
+  ) {
+    // 简单比较：长度不同则不相等
+    if (sourceList.length != targetList.length) {
+      return FieldCompareResult(
+        isIdentical: false,
+        sourceValue: sourceList,
+        targetValue: targetList,
+      );
+    }
+
+    // 逐项比较
+    for (int i = 0; i < sourceList.length; i++) {
+      final sourceItem = sourceList[i];
+      final targetItem = targetList[i];
+
+      if (sourceItem is Map<String, dynamic> &&
+          targetItem is Map<String, dynamic>) {
+        // 递归比较嵌套的Map
+        final result = _compareDocumentDetailed(
+          sourceItem,
+          targetItem,
+          caseSensitive: caseSensitive,
+        );
+        if (!result.isIdentical) {
+          return FieldCompareResult(
+            isIdentical: false,
+            sourceValue: sourceList,
+            targetValue: targetList,
+          );
+        }
+      } else if (sourceItem is List && targetItem is List) {
+        // 递归比较嵌套的List
+        final result = _compareListsDetailed(
+          sourceItem,
+          targetItem,
+          caseSensitive,
+        );
+        if (!result.isIdentical) {
+          return FieldCompareResult(
+            isIdentical: false,
+            sourceValue: sourceList,
+            targetValue: targetList,
+          );
+        }
+      } else {
+        // 比较简单值
+        bool valuesEqual;
+        if (!caseSensitive && sourceItem is String && targetItem is String) {
+          valuesEqual = sourceItem.toLowerCase() == targetItem.toLowerCase();
+        } else {
+          valuesEqual = sourceItem == targetItem;
+        }
+
+        if (!valuesEqual) {
+          return FieldCompareResult(
+            isIdentical: false,
+            sourceValue: sourceList,
+            targetValue: targetList,
+          );
+        }
+      }
+    }
+
+    // 所有项都相等
+    return FieldCompareResult(
+      isIdentical: true,
+      sourceValue: sourceList,
+      targetValue: targetList,
     );
   }
 }

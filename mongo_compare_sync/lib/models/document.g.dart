@@ -25,15 +25,15 @@ Map<String, dynamic> _$MongoDocumentToJson(MongoDocument instance) =>
     };
 
 DocumentDiff _$DocumentDiffFromJson(Map<String, dynamic> json) => DocumentDiff(
-      sourceDocument: MongoDocument.fromJson(
-          json['sourceDocument'] as Map<String, dynamic>),
-      targetDocument: json['targetDocument'] == null
-          ? null
-          : MongoDocument.fromJson(
-              json['targetDocument'] as Map<String, dynamic>),
-      diffType: $enumDecode(_$DocumentDiffTypeEnumMap, json['diffType']),
-      fieldDiffs: json['fieldDiffs'] as Map<String, dynamic>?,
-    );
+  sourceDocument: MongoDocument.fromJson(
+    json['sourceDocument'] as Map<String, dynamic>,
+  ),
+  targetDocument: json['targetDocument'] == null
+      ? null
+      : MongoDocument.fromJson(json['targetDocument'] as Map<String, dynamic>),
+  diffType: $enumDecode(_$DocumentDiffTypeEnumMap, json['diffType']),
+  fieldDiffs: json['fieldDiffs'] as Map<String, dynamic>?,
+);
 
 Map<String, dynamic> _$DocumentDiffToJson(DocumentDiff instance) =>
     <String, dynamic>{

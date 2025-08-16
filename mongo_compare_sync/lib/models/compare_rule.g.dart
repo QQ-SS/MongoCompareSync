@@ -7,14 +7,15 @@ part of 'compare_rule.dart';
 // **************************************************************************
 
 CompareRule _$CompareRuleFromJson(Map<String, dynamic> json) => CompareRule(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      description: json['description'] as String,
-      fieldRules: (json['fieldRules'] as List<dynamic>?)
-              ?.map((e) => FieldRule.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          const [],
-    );
+  id: json['id'] as String,
+  name: json['name'] as String,
+  description: json['description'] as String,
+  fieldRules:
+      (json['fieldRules'] as List<dynamic>?)
+          ?.map((e) => FieldRule.fromJson(e as Map<String, dynamic>))
+          .toList() ??
+      const [],
+);
 
 Map<String, dynamic> _$CompareRuleToJson(CompareRule instance) =>
     <String, dynamic>{
@@ -25,20 +26,20 @@ Map<String, dynamic> _$CompareRuleToJson(CompareRule instance) =>
     };
 
 FieldRule _$FieldRuleFromJson(Map<String, dynamic> json) => FieldRule(
-      fieldPath: json['fieldPath'] as String,
-      ruleType: $enumDecode(_$RuleTypeEnumMap, json['ruleType']),
-      pattern: json['pattern'] as String?,
-      transformFunction: json['transformFunction'] as String?,
-      isRegex: json['isRegex'] as bool? ?? false,
-    );
+  fieldPath: json['fieldPath'] as String,
+  ruleType: $enumDecode(_$RuleTypeEnumMap, json['ruleType']),
+  pattern: json['pattern'] as String?,
+  transformFunction: json['transformFunction'] as String?,
+  isRegex: json['isRegex'] as bool? ?? false,
+);
 
 Map<String, dynamic> _$FieldRuleToJson(FieldRule instance) => <String, dynamic>{
-      'fieldPath': instance.fieldPath,
-      'ruleType': _$RuleTypeEnumMap[instance.ruleType]!,
-      'pattern': instance.pattern,
-      'transformFunction': instance.transformFunction,
-      'isRegex': instance.isRegex,
-    };
+  'fieldPath': instance.fieldPath,
+  'ruleType': _$RuleTypeEnumMap[instance.ruleType]!,
+  'pattern': instance.pattern,
+  'transformFunction': instance.transformFunction,
+  'isRegex': instance.isRegex,
+};
 
 const _$RuleTypeEnumMap = {
   RuleType.ignore: 'ignore',

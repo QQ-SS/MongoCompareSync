@@ -7,18 +7,18 @@ part of 'app_settings.dart';
 // **************************************************************************
 
 AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
-      id: json['id'] as String,
-      themeModeIndex: (json['themeModeIndex'] as num?)?.toInt() ?? 0,
-      locale: json['locale'] as String? ?? 'zh_CN',
-      pageSize: (json['pageSize'] as num?)?.toInt() ?? 20,
-      showObjectIds: json['showObjectIds'] as bool? ?? true,
-      defaultRuleId: json['defaultRuleId'] as String?,
-      caseSensitiveComparison: json['caseSensitiveComparison'] as bool? ?? true,
-      defaultExportFormatIndex:
-          (json['defaultExportFormatIndex'] as num?)?.toInt() ?? 0,
-      confirmBeforeSync: json['confirmBeforeSync'] as bool? ?? true,
-      enableLogging: json['enableLogging'] as bool? ?? false,
-    );
+  id: json['id'] as String,
+  themeModeIndex: (json['themeModeIndex'] as num?)?.toInt() ?? 0,
+  locale: json['locale'] as String? ?? 'zh_CN',
+  pageSize: (json['pageSize'] as num?)?.toInt() ?? 20,
+  showObjectIds: json['showObjectIds'] as bool? ?? true,
+  defaultRuleId: json['defaultRuleId'] as String?,
+  caseSensitiveComparison: json['caseSensitiveComparison'] as bool? ?? true,
+  defaultExportFormatIndex:
+      (json['defaultExportFormatIndex'] as num?)?.toInt() ?? 0,
+  confirmBeforeSync: json['confirmBeforeSync'] as bool? ?? true,
+  enableLogging: json['enableLogging'] as bool? ?? false,
+);
 
 Map<String, dynamic> _$AppSettingsToJson(AppSettings instance) =>
     <String, dynamic>{
