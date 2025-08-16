@@ -309,47 +309,47 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                       '${binding.sourceDatabase}.${binding.sourceCollection}',
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '→ ${binding.targetDatabase}.${binding.targetCollection}',
-                        ),
-                        // 显示比较结果
-                        if (_comparisonResults.containsKey(binding.id) &&
-                            _comparisonResults[binding.id]!.isCompleted)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              '相同: ${_comparisonResults[binding.id]!.sameCount} | 差异: ${_comparisonResults[binding.id]!.diffCount}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color:
-                                    _comparisonResults[binding.id]!.diffCount >
-                                        0
-                                    ? Colors.orange
-                                    : Colors.green,
-                              ),
-                            ),
-                          ),
-                      ],
+                    subtitle: Text(
+                      '→ ${binding.targetDatabase}.${binding.targetCollection}',
                     ),
                     onTap: () => _scrollBindingToVisible(binding),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        // 显示比较结果文本
+                        if (_comparisonResults.containsKey(binding.id) &&
+                            _comparisonResults[binding.id]!.isCompleted)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color:
+                                  _comparisonResults[binding.id]!.diffCount > 0
+                                      ? Colors.orange.withOpacity(0.1)
+                                      : Colors.green.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              '相同: ${_comparisonResults[binding.id]!.sameCount} | 差异: ${_comparisonResults[binding.id]!.diffCount}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color:
+                                    _comparisonResults[binding.id]!.diffCount > 0
+                                        ? Colors.orange
+                                        : Colors.green,
+                              ),
+                            ),
+                          ),
+                        const SizedBox(width: 8),
                         // 显示比较状态的图标
-                        if (_comparisonResults.containsKey(binding.id))
-                          Icon(
-                            _comparisonResults[binding.id]!.isCompleted
-                                ? Icons.check_circle
-                                : Icons.pending,
-                            color: _comparisonResults[binding.id]!.isCompleted
-                                ? (_comparisonResults[binding.id]!.diffCount > 0
-                                      ? Colors.orange
-                                      : Colors.green)
-                                : Colors.grey,
-                            size: 16,
+                        if (_comparisonResults.containsKey(binding.id) &&
+                            !_comparisonResults[binding.id]!.isCompleted)
+                          const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
                           ),
                         IconButton(
                           icon: const Icon(Icons.play_arrow),
