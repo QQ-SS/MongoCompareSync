@@ -298,6 +298,7 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                     subtitle: Text(
                       '→ ${binding.targetDatabase}.${binding.targetCollection}',
                     ),
+                    onTap: () => _scrollBindingToVisible(binding),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
