@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/connection.dart';
+import '../models/document.dart';
+import '../screens/comparison_result_screen.dart';
 import '../widgets/database_collection_panel.dart';
 
 // 比较结果信息类
@@ -327,8 +329,8 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                             decoration: BoxDecoration(
                               color:
                                   _comparisonResults[binding.id]!.diffCount > 0
-                                      ? Colors.orange.withOpacity(0.1)
-                                      : Colors.green.withOpacity(0.1),
+                                  ? Colors.orange.withOpacity(0.1)
+                                  : Colors.green.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
@@ -336,9 +338,10 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                               style: TextStyle(
                                 fontSize: 12,
                                 color:
-                                    _comparisonResults[binding.id]!.diffCount > 0
-                                        ? Colors.orange
-                                        : Colors.green,
+                                    _comparisonResults[binding.id]!.diffCount >
+                                        0
+                                    ? Colors.orange
+                                    : Colors.green,
                               ),
                             ),
                           ),
@@ -361,12 +364,12 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                           onPressed: () => _removeBinding(binding),
                           tooltip: '删除绑定',
                         ),
-                        // 添加滚动到可见区域的按钮
+                        // 查看比较结果按钮
                         IconButton(
-                          icon: const Icon(Icons.visibility),
+                          icon: const Icon(Icons.assessment),
                           iconSize: 20,
-                          onPressed: () => _scrollBindingToVisible(binding),
-                          tooltip: '滚动到可见区域',
+                          onPressed: () => _navigateToComparisonResult(binding),
+                          tooltip: '查看比较结果',
                         ),
                       ],
                     ),
@@ -461,6 +464,124 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
     for (final binding in _bindings) {
       _compareBinding(binding);
     }
+  }
+
+  // 导航到比较结果页面
+  void _navigateToComparisonResult(CollectionBinding binding) {
+    // 如果比较结果尚未完成，先执行比较
+    if (!_comparisonResults.containsKey(binding.id) ||
+        !_comparisonResults[binding.id]!.isCompleted) {
+      _compareBinding(binding);
+    }
+
+    // 生成模拟的比较结果数据
+    final random = math.Random();
+    final results = <DocumentDiff>[];
+
+    // 获取差异数量，如果已有比较结果则使用已有的，否则生成随机数
+    final diffCount = _comparisonResults.containsKey(binding.id)
+        ? _comparisonResults[binding.id]!.diffCount
+        : random.nextInt(20);
+
+    // 生成模拟的文档差异
+    for (int i = 0; i < diffCount; i++) {
+      final docId = 'doc_${i + 1}';
+      final fieldDiffs = <FieldDiff>[];
+
+      // 随机生成1-5个字段差异
+      final fieldCount = random.nextInt(5) + 1;
+      for (int j = 0; j < fieldCount; j++) {
+        final fieldPath = 'field_${j + 1}';
+        final diffType = random.nextInt(3); // 0: 新增, 1: 删除, 2: 修改
+
+        String status;
+        dynamic sourceValue;
+        dynamic targetValue;
+
+        switch (diffType) {
+          case 0: // 新增
+            status = 'added';
+            sourceValue = null;
+            targetValue = 'new_value_$j';
+            break;
+          case 1: // 删除
+            status = 'removed';
+            sourceValue = 'old_value_$j';
+            targetValue = null;
+            break;
+          case 2: // 修改
+          default:
+            status = 'modified';
+            sourceValue = 'old_value_$j';
+            targetValue = 'new_value_$j';
+            break;
+        }
+
+        fieldDiffs.add(
+          FieldDiff(
+            fieldPath: fieldPath,
+            status: status,
+            sourceValue: sourceValue,
+            targetValue: targetValue,
+          ),
+        );
+      }
+
+      // 创建源文档和目标文档
+      final sourceDoc = MongoDocument(
+        id: docId,
+        data: {'_id': docId, 'data': 'source_data_$i'},
+        collectionName: binding.sourceCollection,
+        databaseName: binding.sourceDatabase,
+        connectionId: widget.sourceConnection?.id ?? 'unknown',
+      );
+
+      final targetDoc = MongoDocument(
+        id: docId,
+        data: {'_id': docId, 'data': 'target_data_$i'},
+        collectionName: binding.targetCollection,
+        databaseName: binding.targetDatabase,
+        connectionId: widget.targetConnection?.id ?? 'unknown',
+      );
+
+      // 创建文档差异对象
+      final docDiffType = random.nextInt(3) == 0
+          ? DocumentDiffType.added
+          : (random.nextInt(2) == 0
+                ? DocumentDiffType.removed
+                : DocumentDiffType.modified);
+
+      final Map<String, dynamic> fieldDiffsMap = {};
+      for (var diff in fieldDiffs) {
+        fieldDiffsMap[diff.fieldPath] = {
+          'source': diff.sourceValue,
+          'target': diff.targetValue,
+          'status': diff.status,
+        };
+      }
+
+      results.add(
+        DocumentDiff(
+          sourceDocument: sourceDoc,
+          targetDocument: targetDoc,
+          diffType: docDiffType,
+          fieldDiffs: fieldDiffsMap,
+        ),
+      );
+    }
+
+    // 导航到比较结果页面
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ComparisonResultScreen(
+          results: results,
+          sourceCollection:
+              '${binding.sourceDatabase}.${binding.sourceCollection}',
+          targetCollection:
+              '${binding.targetDatabase}.${binding.targetCollection}',
+        ),
+      ),
+    );
   }
 
   // 滚动单个绑定到可见区域
