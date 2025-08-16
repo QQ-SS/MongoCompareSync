@@ -4,6 +4,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/connection.dart';
 import '../widgets/database_collection_panel.dart';
 
+// 比较结果信息类
+class ComparisonResultInfo {
+  final bool isCompleted; // 比较是否完成
+  final int sameCount; // 相同项数量
+  final int diffCount; // 差异项数量
+
+  ComparisonResultInfo({
+    required this.isCompleted,
+    this.sameCount = 0,
+    this.diffCount = 0,
+  });
+}
+
 class CollectionBinding {
   final String sourceDatabase;
   final String sourceCollection;
@@ -62,7 +75,8 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
   final GlobalKey<DatabaseCollectionPanelState> _targetKey = GlobalKey();
   final GlobalKey _painterKey = GlobalKey();
   bool _showBindingsList = false;
-  Map<String, bool> _comparisonResults = {};
+  // 存储比较结果，包含状态和详细信息
+  Map<String, ComparisonResultInfo> _comparisonResults = {};
 
   Widget _buildConnectionDropdown({
     required String label,
@@ -295,8 +309,30 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                       '${binding.sourceDatabase}.${binding.sourceCollection}',
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    subtitle: Text(
-                      '→ ${binding.targetDatabase}.${binding.targetCollection}',
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '→ ${binding.targetDatabase}.${binding.targetCollection}',
+                        ),
+                        // 显示比较结果
+                        if (_comparisonResults.containsKey(binding.id) &&
+                            _comparisonResults[binding.id]!.isCompleted)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              '相同: ${_comparisonResults[binding.id]!.sameCount} | 差异: ${_comparisonResults[binding.id]!.diffCount}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color:
+                                    _comparisonResults[binding.id]!.diffCount >
+                                        0
+                                    ? Colors.orange
+                                    : Colors.green,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                     onTap: () => _scrollBindingToVisible(binding),
                     trailing: Row(
@@ -305,33 +341,19 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                         // 显示比较状态的图标
                         if (_comparisonResults.containsKey(binding.id))
                           Icon(
-                            _comparisonResults[binding.id]!
+                            _comparisonResults[binding.id]!.isCompleted
                                 ? Icons.check_circle
                                 : Icons.pending,
-                            color: _comparisonResults[binding.id]!
-                                ? Colors.green
-                                : Colors.orange,
+                            color: _comparisonResults[binding.id]!.isCompleted
+                                ? (_comparisonResults[binding.id]!.diffCount > 0
+                                      ? Colors.orange
+                                      : Colors.green)
+                                : Colors.grey,
                             size: 16,
                           ),
                         IconButton(
                           icon: const Icon(Icons.play_arrow),
-                          onPressed: () {
-                            setState(() {
-                              _comparisonResults[binding.id] = false;
-                            });
-                            widget.onCompareBinding(binding);
-                            // 模拟比较完成
-                            Future.delayed(
-                              const Duration(milliseconds: 500),
-                              () {
-                                if (mounted) {
-                                  setState(() {
-                                    _comparisonResults[binding.id] = true;
-                                  });
-                                }
-                              },
-                            );
-                          },
+                          onPressed: () => _compareBinding(binding),
                           tooltip: '执行比较',
                         ),
                         IconButton(
@@ -381,6 +403,8 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
   void _removeBinding(CollectionBinding binding) {
     setState(() {
       _bindings.remove(binding);
+      // 同时移除比较结果
+      _comparisonResults.remove(binding.id);
     });
     widget.onBindingsChanged(_bindings);
   }
@@ -388,31 +412,54 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
   void _clearAllBindings() {
     setState(() {
       _bindings.clear();
+      _comparisonResults.clear();
     });
     widget.onBindingsChanged(_bindings);
   }
 
-  void _compareAllBindings() {
-    // 清空之前的比较结果
+  // 比较单个绑定
+  void _compareBinding(CollectionBinding binding) {
+    // 设置比较状态为进行中
     setState(() {
-      _comparisonResults.clear();
+      _comparisonResults[binding.id] = ComparisonResultInfo(isCompleted: false);
     });
+
+    // 执行比较
+    widget.onCompareBinding(binding);
+
+    // 模拟比较完成，生成随机结果
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        // 生成随机的比较结果
+        final random = math.Random();
+        final sameCount = random.nextInt(100) + 10;
+        final diffCount = random.nextInt(20);
+
+        setState(() {
+          _comparisonResults[binding.id] = ComparisonResultInfo(
+            isCompleted: true,
+            sameCount: sameCount,
+            diffCount: diffCount,
+          );
+        });
+      }
+    });
+  }
+
+  void _compareAllBindings() {
+    if (_bindings.isEmpty) return;
+
+    // 显示一个短暂的提示
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('开始批量比较...'),
+        duration: Duration(seconds: 1),
+      ),
+    );
 
     // 对所有绑定进行比较
     for (final binding in _bindings) {
-      // 记录比较状态，默认为进行中
-      setState(() {
-        _comparisonResults[binding.id] = false;
-      });
-
-      // 执行比较
-      widget.onCompareBinding(binding);
-
-      // 在实际应用中，这里应该有一个回调来更新比较结果
-      // 由于我们没有实际的比较结果回调，这里模拟设置为已完成
-      setState(() {
-        _comparisonResults[binding.id] = true;
-      });
+      _compareBinding(binding);
     }
   }
 
@@ -445,13 +492,6 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
         duration: Duration(milliseconds: 500),
       ),
     );
-
-    // // 如果绑定列表是打开的，关闭它以便更好地查看集合
-    // if (_showBindingsList) {
-    //   setState(() {
-    //     _showBindingsList = false;
-    //   });
-    // }
   }
 
   bool _isSourceBound(String database, String collection) {
@@ -562,20 +602,8 @@ class ConnectionLinePainter extends CustomPainter {
 
         // 根据是否为数据库级别调整连接点位置
         if (isSourceDatabaseCollapsed) {
-          // 如果是数据库级别（收缩状态），连接到ExpansionTile的右侧
-          // sourceCenter = Offset(
-          //   sourceLocalPosition.dx +
-          //       sourceRenderBox.size.width -
-          //       16, // 右侧留出一些边距
-          //   sourceLocalPosition.dy + 24, // ExpansionTile标题的高度约为48，取中点
-          // );
           print('ConnectionLinePainter: 使用 数据库项 位置作为源连接点: $sourceCenter');
         } else {
-          // 如果是集合级别（展开状态），连接到集合项的右侧
-          // sourceCenter = Offset(
-          //   sourceLocalPosition.dx + sourceRenderBox.size.width,
-          //   sourceLocalPosition.dy + sourceRenderBox.size.height / 2,
-          // );
           print('ConnectionLinePainter: 使用 集合项 位置作为源连接点: $sourceCenter');
         }
 
@@ -584,26 +612,8 @@ class ConnectionLinePainter extends CustomPainter {
           targetLocalPosition.dy + targetRenderBox.size.height / 2,
         );
         if (isTargetDatabaseCollapsed) {
-          // 如果是数据库级别（收缩状态），直接使用固定位置
-          // 获取目标数据库项的宽度，用于计算
-          // final dbWidth = targetRenderBox.size.width;
-          // final dbHeight = targetRenderBox.size.height;
-
-          // print('ConnectionLinePainter: 目标数据库项宽度: $dbWidth, 高度: $dbHeight');
-
-          // // 硬编码连接到数据库项的图标位置
-          // targetCenter = Offset(
-          //   targetLocalPosition.dx + 40, // 进一步调整水平位置
-          //   targetLocalPosition.dy + 24, // 保持垂直位置不变
-          // );
-
           print('ConnectionLinePainter: 使用 数据库项 位置作为目标连接点: $targetCenter');
         } else {
-          // 如果是集合级别（展开状态），连接到集合项的左侧
-          // targetCenter = Offset(
-          //   targetLocalPosition.dx,
-          //   targetLocalPosition.dy + targetRenderBox.size.height / 2,
-          // );
           print('ConnectionLinePainter: 使用 集合项 位置作为目标连接点: $targetCenter');
         }
 
