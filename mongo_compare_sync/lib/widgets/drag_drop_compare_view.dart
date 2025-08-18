@@ -278,27 +278,15 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                   ),
                   const Spacer(),
                   if (_bindings.isNotEmpty) ...[
-                    Tooltip(
-                      message: '将源与目标集合滚动到可见区域',
-                      child: TextButton.icon(
-                        onPressed: () {
-                          if (_bindings.isNotEmpty) {
-                            _scrollBindingToVisible(_bindings.first);
-                          }
-                        },
-                        icon: const Icon(Icons.visibility),
-                        label: const Text('滚动到可见区域'),
-                      ),
+                    TextButton.icon(
+                      onPressed: _clearAllBindings,
+                      icon: const Icon(Icons.clear_all),
+                      label: const Text('清空'),
                     ),
                     TextButton.icon(
                       onPressed: _compareAllBindings,
                       icon: const Icon(Icons.play_arrow),
                       label: const Text('批量比较'),
-                    ),
-                    TextButton.icon(
-                      onPressed: _clearAllBindings,
-                      icon: const Icon(Icons.clear_all),
-                      label: const Text('清空'),
                     ),
                     IconButton(
                       icon: const Icon(Icons.close),
@@ -373,29 +361,22 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                             height: 16,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           ),
+                        IconButton(
+                          icon: const Icon(Icons.delete),
+                          onPressed: () => _removeBinding(binding),
+                          tooltip: '删除绑定',
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.play_arrow),
+                          onPressed: () => _navigateToComparisonResult(binding),
+                          tooltip: '执行比较',
+                        ),
                         // 滚动到可见区域按钮
                         IconButton(
                           icon: const Icon(Icons.visibility),
                           iconSize: 20,
                           onPressed: () => _scrollBindingToVisible(binding),
                           tooltip: '滚动到可见区域',
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.play_arrow),
-                          onPressed: () => _compareBinding(binding),
-                          tooltip: '执行比较',
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete),
-                          onPressed: () => _removeBinding(binding),
-                          tooltip: '删除绑定',
-                        ),
-                        // 查看比较结果按钮
-                        IconButton(
-                          icon: const Icon(Icons.assessment),
-                          iconSize: 20,
-                          onPressed: () => _navigateToComparisonResult(binding),
-                          tooltip: '查看比较结果',
                         ),
                       ],
                     ),
