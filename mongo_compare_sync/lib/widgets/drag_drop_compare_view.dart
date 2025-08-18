@@ -714,6 +714,8 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
           results: diffs,
           sourceCollection: binding.sourceCollection,
           targetCollection: binding.targetCollection,
+          sourceDatabaseName: binding.sourceDatabase,
+          targetDatabaseName: binding.targetDatabase,
           mongoService: _mongoService,
           sourceConnectionId: widget.sourceConnection?.id,
           targetConnectionId: widget.targetConnection?.id,

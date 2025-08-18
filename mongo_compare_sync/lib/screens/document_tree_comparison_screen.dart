@@ -9,6 +9,8 @@ class DocumentTreeComparisonScreen extends ConsumerStatefulWidget {
   final List<DocumentDiff> results;
   final String sourceCollection;
   final String targetCollection;
+  final String sourceDatabaseName;
+  final String targetDatabaseName;
   final MongoService mongoService;
   final String? sourceConnectionId;
   final String? targetConnectionId;
@@ -19,6 +21,8 @@ class DocumentTreeComparisonScreen extends ConsumerStatefulWidget {
     required this.results,
     required this.sourceCollection,
     required this.targetCollection,
+    required this.sourceDatabaseName,
+    required this.targetDatabaseName,
     required this.mongoService,
     this.sourceConnectionId,
     this.targetConnectionId,
