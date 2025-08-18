@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/collection_binding.dart';
 import '../models/connection.dart';
 import '../screens/document_tree_comparison_screen.dart';
 import '../services/mongo_service.dart';
+import '../providers/connection_provider.dart';
 
-class BindingListButton extends StatefulWidget {
+class BindingListButton extends ConsumerStatefulWidget {
   final List<CollectionBinding> bindings;
-  final MongoService mongoService;
   final MongoConnection? sourceConnection;
   final MongoConnection? targetConnection;
   final Function(CollectionBinding) onRemoveBinding;
@@ -16,7 +17,6 @@ class BindingListButton extends StatefulWidget {
   const BindingListButton({
     super.key,
     required this.bindings,
-    required this.mongoService,
     required this.sourceConnection,
     required this.targetConnection,
     required this.onRemoveBinding,
@@ -25,10 +25,10 @@ class BindingListButton extends StatefulWidget {
   });
 
   @override
-  State<BindingListButton> createState() => _BindingListButtonState();
+  ConsumerState<BindingListButton> createState() => _BindingListButtonState();
 }
 
-class _BindingListButtonState extends State<BindingListButton> {
+class _BindingListButtonState extends ConsumerState<BindingListButton> {
   bool _showBindingsList = false;
 
   @override
@@ -185,7 +185,6 @@ class _BindingListButtonState extends State<BindingListButton> {
           targetCollection: binding.targetCollection,
           sourceDatabaseName: binding.sourceDatabase,
           targetDatabaseName: binding.targetDatabase,
-          mongoService: widget.mongoService,
           sourceConnectionId: widget.sourceConnection?.id,
           targetConnectionId: widget.targetConnection?.id,
           ignoredFields: [], // 可以从设置中获取忽略字段

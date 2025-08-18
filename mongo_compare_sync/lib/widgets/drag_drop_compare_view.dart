@@ -21,8 +21,7 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
   final GlobalKey<DatabaseCollectionPanelState> _sourceKey = GlobalKey();
   final GlobalKey<DatabaseCollectionPanelState> _targetKey = GlobalKey();
   final GlobalKey _painterKey = GlobalKey();
-  // MongoDB服务实例
-  final MongoService _mongoService = MongoService();
+  // MongoDB服务实例通过Provider获取
   MongoConnection? _sourceConnection;
   MongoConnection? _targetConnection;
 
@@ -157,7 +156,6 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                         Positioned.fill(
                           child: BindingListButton(
                             bindings: _bindings,
-                            mongoService: _mongoService,
                             sourceConnection: _sourceConnection,
                             targetConnection: _targetConnection,
                             onRemoveBinding: _removeBinding,
