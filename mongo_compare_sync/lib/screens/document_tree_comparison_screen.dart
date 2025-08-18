@@ -370,13 +370,6 @@ class _DocumentTreeComparisonScreenState
         title: Text(
           '文档比较: ${widget.sourceCollection} vs ${widget.targetCollection}',
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: '刷新',
-            onPressed: _loadDocuments,
-          ),
-        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -434,41 +427,8 @@ class _DocumentTreeComparisonScreenState
                     ),
                   ),
 
-                  // 中间刷新按钮区域
-                  Container(
-                    width: 40,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainerLow,
-                      border: Border(
-                        left: BorderSide(color: Theme.of(context).dividerColor),
-                        right: BorderSide(
-                          color: Theme.of(context).dividerColor,
-                        ),
-                      ),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Tooltip(
-                          message: '从数据库重新加载数据',
-                          child: IconButton(
-                            icon: const Icon(Icons.refresh),
-                            onPressed: _reloadFromDatabase,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Tooltip(
-                          message: '重新比较文档',
-                          child: IconButton(
-                            icon: const Icon(Icons.compare_arrows),
-                            onPressed: _recompareDocuments,
-                            color: Theme.of(context).colorScheme.secondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  // 中间分隔线
+                  Container(width: 1, color: Theme.of(context).dividerColor),
 
                   // 目标文档树
                   Expanded(
@@ -549,6 +509,19 @@ class _DocumentTreeComparisonScreenState
                   onPressed: canDeleteSource ? _deleteSource : null,
                 ),
               ],
+            ),
+          ),
+
+          // 中间刷新按钮
+          Tooltip(
+            message: '刷新数据并重新比较',
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.refresh),
+              label: const Text('刷新'),
+              onPressed: () async {
+                await _reloadFromDatabase();
+                await _recompareDocuments();
+              },
             ),
           ),
 
