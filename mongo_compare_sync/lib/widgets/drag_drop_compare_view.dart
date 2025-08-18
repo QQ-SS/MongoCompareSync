@@ -5,11 +5,10 @@ import '../models/collection_binding.dart';
 import '../services/mongo_service.dart';
 import '../widgets/database_collection_panel.dart';
 import '../widgets/binding_list_button.dart';
+import '../providers/connection_provider.dart';
 
 class DragDropCompareView extends ConsumerStatefulWidget {
-  final List<MongoConnection> connections;
-
-  const DragDropCompareView({super.key, required this.connections});
+  const DragDropCompareView({super.key});
 
   @override
   ConsumerState<DragDropCompareView> createState() =>
@@ -74,97 +73,109 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        children: [
-          Row(
+    // 从 ConnectionProvider 获取连接列表
+    final connectionsState = ref.watch(connectionsProvider);
+
+    return connectionsState.when(
+      data: (connections) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
             children: [
-              Flexible(
-                flex: 2,
-                child: _buildConnectionDropdown(
-                  label: '源连接',
-                  connections: widget.connections,
-                  onConnectionChanged: onSourceConnectionChanged,
-                ),
+              Row(
+                children: [
+                  Flexible(
+                    flex: 2,
+                    child: _buildConnectionDropdown(
+                      label: '源连接',
+                      connections: connections,
+                      onConnectionChanged: onSourceConnectionChanged,
+                    ),
+                  ),
+                  const Spacer(flex: 1),
+                  Flexible(
+                    flex: 2,
+                    child: _buildConnectionDropdown(
+                      label: '目标连接',
+                      connections: connections,
+                      onConnectionChanged: onTargetConnectionChanged,
+                    ),
+                  ),
+                ],
               ),
-              const Spacer(flex: 1),
-              Flexible(
-                flex: 2,
-                child: _buildConnectionDropdown(
-                  label: '目标连接',
-                  connections: widget.connections,
-                  onConnectionChanged: onTargetConnectionChanged,
+              const SizedBox(height: 16),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return Stack(
+                      children: [
+                        Positioned.fill(
+                          child: Row(
+                            children: [
+                              Flexible(
+                                flex: 2,
+                                child: DatabaseCollectionPanel(
+                                  key: _sourceKey,
+                                  connection: _sourceConnection,
+                                  type: PanelType.source,
+                                  onBindingCheck: _isSourceBound,
+                                ),
+                              ),
+                              const Spacer(flex: 1),
+                              Flexible(
+                                flex: 2,
+                                child: DatabaseCollectionPanel(
+                                  key: _targetKey,
+                                  connection: _targetConnection,
+                                  type: PanelType.target,
+                                  onDragAccept: _createBinding,
+                                  onBindingCheck: _isTargetBound,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IgnorePointer(
+                          child: CustomPaint(
+                            key: _painterKey,
+                            painter: ConnectionLinePainter(
+                              bindings: _bindings,
+                              sourceKey: _sourceKey,
+                              targetKey: _targetKey,
+                              context: context,
+                              painterRenderBox:
+                                  _painterKey.currentContext?.findRenderObject()
+                                      as RenderBox?,
+                            ),
+                            size: Size(
+                              constraints.maxWidth,
+                              constraints.maxHeight,
+                            ),
+                          ),
+                        ),
+                        // 使用独立的绑定列表按钮组件
+                        Positioned.fill(
+                          child: BindingListButton(
+                            bindings: _bindings,
+                            mongoService: _mongoService,
+                            sourceConnection: _sourceConnection,
+                            targetConnection: _targetConnection,
+                            onRemoveBinding: _removeBinding,
+                            onScrollToBinding: _scrollBindingToVisible,
+                            onClearAllBindings: _clearAllBindings,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                return Stack(
-                  children: [
-                    Positioned.fill(
-                      child: Row(
-                        children: [
-                          Flexible(
-                            flex: 2,
-                            child: DatabaseCollectionPanel(
-                              key: _sourceKey,
-                              connection: _sourceConnection,
-                              type: PanelType.source,
-                              onBindingCheck: _isSourceBound,
-                            ),
-                          ),
-                          const Spacer(flex: 1),
-                          Flexible(
-                            flex: 2,
-                            child: DatabaseCollectionPanel(
-                              key: _targetKey,
-                              connection: _targetConnection,
-                              type: PanelType.target,
-                              onDragAccept: _createBinding,
-                              onBindingCheck: _isTargetBound,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IgnorePointer(
-                      child: CustomPaint(
-                        key: _painterKey,
-                        painter: ConnectionLinePainter(
-                          bindings: _bindings,
-                          sourceKey: _sourceKey,
-                          targetKey: _targetKey,
-                          context: context,
-                          painterRenderBox:
-                              _painterKey.currentContext?.findRenderObject()
-                                  as RenderBox?,
-                        ),
-                        size: Size(constraints.maxWidth, constraints.maxHeight),
-                      ),
-                    ),
-                    // 使用独立的绑定列表按钮组件
-                    Positioned.fill(
-                      child: BindingListButton(
-                        bindings: _bindings,
-                        mongoService: _mongoService,
-                        sourceConnection: _sourceConnection,
-                        targetConnection: _targetConnection,
-                        onRemoveBinding: _removeBinding,
-                        onScrollToBinding: _scrollBindingToVisible,
-                        onClearAllBindings: _clearAllBindings,
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-        ],
-      ),
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stackTrace) => Center(child: Text('加载连接失败: $error')),
     );
   }
 

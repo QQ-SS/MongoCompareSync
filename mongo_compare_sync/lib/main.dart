@@ -24,21 +24,21 @@ void main() async {
     () async {
       // 确保Flutter绑定初始化
       WidgetsFlutterBinding.ensureInitialized();
+
+      // 初始化MongoService
+      final mongoService = MongoService();
       try {
+        // 初始化ConnectionRepository
+        await ConnectionRepository(mongoService: mongoService).init();
+
         // 初始化LogService
         await LogService.instance.init();
 
         // 初始化SettingsRepository (现在使用文件系统)
         await SettingsRepository().init();
 
-        // 初始化MongoService
-        final mongoService = MongoService();
-
         // 初始化CompareRuleRepository
         await CompareRuleRepository().init();
-
-        // 初始化ConnectionRepository
-        await ConnectionRepository(mongoService: mongoService).init();
 
         // 运行应用
         runApp(const ProviderScope(child: MongoCompareSyncApp()));

@@ -134,11 +134,7 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
   Widget _buildDragDropCompareView(List<MongoConnection> allConnections) {
     return Padding(
       padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          Expanded(child: DragDropCompareView(connections: allConnections)),
-        ],
-      ),
+      child: Column(children: [Expanded(child: DragDropCompareView())]),
     );
   }
 
