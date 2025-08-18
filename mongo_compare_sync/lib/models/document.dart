@@ -82,7 +82,7 @@ class FieldDiff {
   final String fieldPath;
   final dynamic sourceValue;
   final dynamic targetValue;
-  final String status; // 'added', 'removed', 'modified'
+  final String? status; // 'added', 'removed', 'modified'
 
   FieldDiff({
     required this.fieldPath,
@@ -97,7 +97,7 @@ class FieldDiff {
       fieldPath: path,
       sourceValue: map['source'],
       targetValue: map['target'],
-      status: map['status'] as String,
+      status: map['status'] as String?,
     );
   }
 

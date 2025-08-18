@@ -56,6 +56,151 @@ class _DocumentTreeComparisonScreenState
     _loadDocuments();
   }
 
+  // 从数据库重新加载数据
+  Future<void> _reloadFromDatabase() async {
+    setState(() {
+      _isLoading = true;
+      _sourceDocuments.clear();
+      _targetDocuments.clear();
+    });
+
+    await _loadDocuments();
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('已从数据库重新加载文档数据')));
+  }
+
+  // 重新比较文档
+  Future<void> _recompareDocuments() async {
+    if (_sourceDocuments.isEmpty || _targetDocuments.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请先加载文档数据')));
+      return;
+    }
+
+    setState(() {
+      _isProcessing = true;
+      _processingMessage = '正在重新比较文档...';
+    });
+
+    try {
+      // 更新差异状态
+      for (int i = 0; i < widget.results.length; i++) {
+        final docId = widget.results[i].sourceDocument.id;
+        final sourceDoc = _sourceDocuments[docId];
+        final targetDoc = _targetDocuments[docId];
+
+        if (sourceDoc != null && targetDoc != null) {
+          // 比较文档字段
+          final fieldDiffs = <String, FieldDiff>{};
+          _compareDocuments(sourceDoc, targetDoc, '', fieldDiffs);
+
+          // 更新差异类型
+          DocumentDiffType diffType = fieldDiffs.isEmpty
+              ? DocumentDiffType.unchanged
+              : DocumentDiffType.modified;
+
+          widget.results[i] = DocumentDiff(
+            sourceDocument: widget.results[i].sourceDocument,
+            targetDocument: widget.results[i].targetDocument,
+            diffType: diffType,
+            fieldDiffs: fieldDiffs,
+          );
+        } else if (sourceDoc != null && targetDoc == null) {
+          widget.results[i] = DocumentDiff(
+            sourceDocument: widget.results[i].sourceDocument,
+            targetDocument: widget.results[i].targetDocument,
+            diffType: DocumentDiffType.added,
+            fieldDiffs: {},
+          );
+        } else if (sourceDoc == null && targetDoc != null) {
+          widget.results[i] = DocumentDiff(
+            sourceDocument: widget.results[i].sourceDocument,
+            targetDocument: widget.results[i].targetDocument,
+            diffType: DocumentDiffType.removed,
+            fieldDiffs: {},
+          );
+        }
+      }
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('文档比较已更新')));
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('重新比较文档失败: $e')));
+    } finally {
+      setState(() {
+        _isProcessing = false;
+      });
+    }
+  }
+
+  // 比较两个文档的字段
+  void _compareDocuments(
+    Map<String, dynamic> sourceDoc,
+    Map<String, dynamic> targetDoc,
+    String parentPath,
+    Map<String, FieldDiff> fieldDiffs,
+  ) {
+    // 获取所有字段名
+    final Set<String> allFields = {...sourceDoc.keys, ...targetDoc.keys};
+
+    for (final field in allFields) {
+      // 跳过忽略的字段
+      if (widget.ignoredFields.contains(field)) continue;
+
+      final String fieldPath = parentPath.isEmpty
+          ? field
+          : '$parentPath.$field';
+      final sourceValue = sourceDoc[field];
+      final targetValue = targetDoc[field];
+
+      // 字段只存在于一侧
+      if (!sourceDoc.containsKey(field)) {
+        fieldDiffs[fieldPath] = FieldDiff(
+          fieldPath: fieldPath,
+          sourceValue: null,
+          targetValue: targetValue,
+          status: 'added',
+        );
+        continue;
+      }
+
+      if (!targetDoc.containsKey(field)) {
+        fieldDiffs[fieldPath] = FieldDiff(
+          fieldPath: fieldPath,
+          sourceValue: sourceValue,
+          targetValue: null,
+          status: 'removed',
+        );
+        continue;
+      }
+
+      // 两侧都有字段，比较值
+      if (sourceValue is Map && targetValue is Map) {
+        // 递归比较嵌套对象
+        _compareDocuments(
+          Map<String, dynamic>.from(sourceValue),
+          Map<String, dynamic>.from(targetValue),
+          fieldPath,
+          fieldDiffs,
+        );
+      } else if (sourceValue != targetValue) {
+        // 值不同
+        fieldDiffs[fieldPath] = FieldDiff(
+          fieldPath: fieldPath,
+          sourceValue: sourceValue,
+          targetValue: targetValue,
+          status: 'modified',
+        );
+      }
+    }
+  }
+
   // 加载完整文档数据
   Future<void> _loadDocuments() async {
     setState(() {
@@ -289,8 +434,41 @@ class _DocumentTreeComparisonScreenState
                     ),
                   ),
 
-                  // 分隔线
-                  Container(width: 1, color: Theme.of(context).dividerColor),
+                  // 中间刷新按钮区域
+                  Container(
+                    width: 40,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerLow,
+                      border: Border(
+                        left: BorderSide(color: Theme.of(context).dividerColor),
+                        right: BorderSide(
+                          color: Theme.of(context).dividerColor,
+                        ),
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Tooltip(
+                          message: '从数据库重新加载数据',
+                          child: IconButton(
+                            icon: const Icon(Icons.refresh),
+                            onPressed: _reloadFromDatabase,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Tooltip(
+                          message: '重新比较文档',
+                          child: IconButton(
+                            icon: const Icon(Icons.compare_arrows),
+                            onPressed: _recompareDocuments,
+                            color: Theme.of(context).colorScheme.secondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
 
                   // 目标文档树
                   Expanded(
