@@ -62,12 +62,6 @@ class _DocumentTreeComparisonScreenState
 
   // 从数据库重新加载数据
   Future<void> _reloadFromDatabase() async {
-    setState(() {
-      _isLoading = true;
-      _sourceDocuments.clear();
-      _targetDocuments.clear();
-    });
-
     await _loadDocuments();
 
     ScaffoldMessenger.of(
@@ -259,25 +253,6 @@ class _DocumentTreeComparisonScreenState
           ScaffoldMessenger.of(
             context,
           ).showSnackBar(SnackBar(content: Text('加载目标数据库文档失败: $e')));
-        }
-      }
-
-      // 处理差异文档，确保它们在源文档和目标文档映射中
-      final Map<String, DocumentDiff> diffsByDocId = {};
-      for (final diff in widget.results) {
-        diffsByDocId[diff.sourceDocument.id] = diff;
-
-        // 如果差异文档在源文档映射中不存在，但差异类型不是"已删除"，则尝试加载
-        if (!_sourceDocuments.containsKey(diff.sourceDocument.id) &&
-            diff.diffType != DocumentDiffType.removed) {
-          _sourceDocuments[diff.sourceDocument.id] = diff.sourceDocument.data;
-        }
-
-        // 如果差异文档在目标文档映射中不存在，但差异类型不是"已添加"，则尝试加载
-        if (diff.targetDocument != null &&
-            !_targetDocuments.containsKey(diff.sourceDocument.id) &&
-            diff.diffType != DocumentDiffType.added) {
-          _targetDocuments[diff.sourceDocument.id] = diff.targetDocument!.data;
         }
       }
     } catch (e) {
