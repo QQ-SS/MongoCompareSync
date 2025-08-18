@@ -179,7 +179,6 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                     Positioned.fill(
                       child: BindingListButton(
                         bindings: _bindings,
-                        comparisonResults: _comparisonResults,
                         onRemoveBinding: _removeBinding,
                         onNavigateToComparison: _navigateToComparisonResult,
                         onScrollToBinding: _scrollBindingToVisible,

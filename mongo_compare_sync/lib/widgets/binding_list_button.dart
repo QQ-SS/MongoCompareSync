@@ -3,7 +3,6 @@ import '../models/collection_binding.dart';
 
 class BindingListButton extends StatefulWidget {
   final List<CollectionBinding> bindings;
-  final Map<String, ComparisonResultInfo> comparisonResults;
   final Function(CollectionBinding) onRemoveBinding;
   final Function(CollectionBinding) onNavigateToComparison;
   final Function(CollectionBinding) onScrollToBinding;
@@ -13,7 +12,6 @@ class BindingListButton extends StatefulWidget {
   const BindingListButton({
     Key? key,
     required this.bindings,
-    required this.comparisonResults,
     required this.onRemoveBinding,
     required this.onNavigateToComparison,
     required this.onScrollToBinding,
@@ -140,47 +138,6 @@ class _BindingListButtonState extends State<BindingListButton> {
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // 显示比较结果文本
-                        if (widget.comparisonResults.containsKey(binding.id) &&
-                            widget.comparisonResults[binding.id]!.isCompleted)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color:
-                                  widget
-                                          .comparisonResults[binding.id]!
-                                          .diffCount >
-                                      0
-                                  ? Colors.orange.withOpacity(0.1)
-                                  : Colors.green.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              '相同: ${widget.comparisonResults[binding.id]!.sameCount} | 差异: ${widget.comparisonResults[binding.id]!.diffCount}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color:
-                                    widget
-                                            .comparisonResults[binding.id]!
-                                            .diffCount >
-                                        0
-                                    ? Colors.orange
-                                    : Colors.green,
-                              ),
-                            ),
-                          ),
-                        const SizedBox(width: 8),
-                        // 显示比较状态的图标
-                        if (widget.comparisonResults.containsKey(binding.id) &&
-                            !widget.comparisonResults[binding.id]!.isCompleted)
-                          const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
                         IconButton(
                           icon: const Icon(Icons.delete),
                           onPressed: () => widget.onRemoveBinding(binding),
