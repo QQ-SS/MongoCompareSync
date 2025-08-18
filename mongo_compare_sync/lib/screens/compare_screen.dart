@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/collection_binding.dart';
 import '../models/connection.dart';
 import '../models/collection.dart';
 import '../models/document.dart';

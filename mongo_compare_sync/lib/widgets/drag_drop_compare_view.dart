@@ -5,48 +5,11 @@ import 'package:mongo_dart/mongo_dart.dart' hide Size;
 import '../models/connection.dart';
 import '../models/document.dart';
 import '../models/collection_compare_result.dart';
+import '../models/collection_binding.dart';
 import '../screens/document_tree_comparison_screen.dart';
 import '../services/mongo_service.dart';
 import '../widgets/database_collection_panel.dart';
-
-// 比较结果信息类
-class ComparisonResultInfo {
-  final bool isCompleted; // 比较是否完成
-  final int sameCount; // 相同项数量
-  final int diffCount; // 差异项数量
-
-  ComparisonResultInfo({
-    required this.isCompleted,
-    this.sameCount = 0,
-    this.diffCount = 0,
-  });
-}
-
-class CollectionBinding {
-  final String sourceDatabase;
-  final String sourceCollection;
-  final String targetDatabase;
-  final String targetCollection;
-  final String id;
-
-  CollectionBinding({
-    required this.sourceDatabase,
-    required this.sourceCollection,
-    required this.targetDatabase,
-    required this.targetCollection,
-    required this.id,
-  });
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is CollectionBinding &&
-          runtimeType == other.runtimeType &&
-          id == other.id;
-
-  @override
-  int get hashCode => id.hashCode;
-}
+import '../widgets/binding_list_button.dart';
 
 class DragDropCompareView extends ConsumerStatefulWidget {
   final List<MongoConnection> connections;
@@ -79,7 +42,6 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
   final GlobalKey<DatabaseCollectionPanelState> _sourceKey = GlobalKey();
   final GlobalKey<DatabaseCollectionPanelState> _targetKey = GlobalKey();
   final GlobalKey _painterKey = GlobalKey();
-  bool _showBindingsList = false;
   // 存储比较结果，包含状态和详细信息
   Map<String, ComparisonResultInfo> _comparisonResults = {};
   // 存储详细比较结果，用于导航到比较结果页面
@@ -213,179 +175,24 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                         size: Size(constraints.maxWidth, constraints.maxHeight),
                       ),
                     ),
-                    // 浮动按钮，显示绑定数量
-                    if (_bindings.isNotEmpty && !_showBindingsList)
-                      Positioned(
-                        bottom: 32,
-                        right: 16,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            FloatingActionButton.extended(
-                              onPressed: () {
-                                setState(() {
-                                  _showBindingsList = true;
-                                });
-                              },
-                              icon: const Icon(Icons.link),
-                              label: Text(' ${_bindings.length}'),
-                              backgroundColor: Theme.of(
-                                context,
-                              ).colorScheme.primary,
-                            ),
-                          ],
-                        ),
+                    // 使用独立的绑定列表按钮组件
+                    Positioned.fill(
+                      child: BindingListButton(
+                        bindings: _bindings,
+                        comparisonResults: _comparisonResults,
+                        onRemoveBinding: _removeBinding,
+                        onNavigateToComparison: _navigateToComparisonResult,
+                        onScrollToBinding: _scrollBindingToVisible,
+                        onClearAllBindings: _clearAllBindings,
+                        onCompareAllBindings: _compareAllBindings,
                       ),
-                    // 绑定列表，点击浮动按钮后显示
-                    if (_bindings.isNotEmpty && _showBindingsList)
-                      Positioned(
-                        bottom: 32,
-                        left: 16,
-                        right: 16,
-                        child: _buildBindingsList(),
-                      ),
+                    ),
                   ],
                 );
               },
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildBindingsList() {
-    return Card(
-      elevation: 4,
-      child: Container(
-        constraints: const BoxConstraints(maxHeight: 200),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.link,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '集合绑定 (${_bindings.length})',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const Spacer(),
-                  if (_bindings.isNotEmpty) ...[
-                    TextButton.icon(
-                      onPressed: _clearAllBindings,
-                      icon: const Icon(Icons.clear_all),
-                      label: const Text('清空'),
-                    ),
-                    TextButton.icon(
-                      onPressed: _compareAllBindings,
-                      icon: const Icon(Icons.play_arrow),
-                      label: const Text('批量比较'),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () {
-                        setState(() {
-                          _showBindingsList = false;
-                        });
-                      },
-                      tooltip: '关闭',
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-            Flexible(
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: _bindings.length,
-                itemBuilder: (context, index) {
-                  final binding = _bindings[index];
-                  return ListTile(
-                    dense: true,
-                    leading: Icon(
-                      Icons.compare_arrows,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    title: Text(
-                      '${binding.sourceDatabase}.${binding.sourceCollection}',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Text(
-                      '→ ${binding.targetDatabase}.${binding.targetCollection}',
-                    ),
-                    onTap: () => _scrollBindingToVisible(binding),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // 显示比较结果文本
-                        if (_comparisonResults.containsKey(binding.id) &&
-                            _comparisonResults[binding.id]!.isCompleted)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color:
-                                  _comparisonResults[binding.id]!.diffCount > 0
-                                  ? Colors.orange.withOpacity(0.1)
-                                  : Colors.green.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              '相同: ${_comparisonResults[binding.id]!.sameCount} | 差异: ${_comparisonResults[binding.id]!.diffCount}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color:
-                                    _comparisonResults[binding.id]!.diffCount >
-                                        0
-                                    ? Colors.orange
-                                    : Colors.green,
-                              ),
-                            ),
-                          ),
-                        const SizedBox(width: 8),
-                        // 显示比较状态的图标
-                        if (_comparisonResults.containsKey(binding.id) &&
-                            !_comparisonResults[binding.id]!.isCompleted)
-                          const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        IconButton(
-                          icon: const Icon(Icons.delete),
-                          onPressed: () => _removeBinding(binding),
-                          tooltip: '删除绑定',
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.play_arrow),
-                          onPressed: () => _navigateToComparisonResult(binding),
-                          tooltip: '执行比较',
-                        ),
-                        // 滚动到可见区域按钮
-                        IconButton(
-                          icon: const Icon(Icons.visibility),
-                          iconSize: 20,
-                          onPressed: () => _scrollBindingToVisible(binding),
-                          tooltip: '滚动到可见区域',
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
