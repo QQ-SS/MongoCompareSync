@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/connection.dart';
-import '../models/collection.dart';
 import '../providers/connection_provider.dart';
-import '../repositories/connection_repository.dart';
 import '../services/log_service.dart';
 import '../widgets/loading_indicator.dart';
-import '../widgets/skeleton_loader.dart';
 
 /// Represents a node in the database/collection tree view.
 class TreeViewNode {

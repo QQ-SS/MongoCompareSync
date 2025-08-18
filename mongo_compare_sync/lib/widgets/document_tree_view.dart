@@ -111,7 +111,7 @@ class _DocumentTreeViewState extends State<DocumentTreeView> {
           isExpandable = true;
           nestedData = {};
           for (int i = 0; i < value.length; i++) {
-            nestedData!['[$i]'] = value[i];
+            nestedData['[$i]'] = value[i];
           }
         }
       } else {
@@ -189,7 +189,7 @@ class _DocumentTreeViewState extends State<DocumentTreeView> {
                       if (isExpanded && isExpandable && nestedData != null)
                         Padding(
                           padding: const EdgeInsets.only(left: 16.0, top: 4.0),
-                          child: _buildNestedFields(nestedData, '$nodePath'),
+                          child: _buildNestedFields(nestedData, nodePath),
                         ),
                     ],
                   ),
@@ -241,7 +241,7 @@ class _DocumentTreeViewState extends State<DocumentTreeView> {
           isExpandable = true;
           nestedData = {};
           for (int i = 0; i < value.length; i++) {
-            nestedData!['[$i]'] = value[i];
+            nestedData['[$i]'] = value[i];
           }
         }
       } else {

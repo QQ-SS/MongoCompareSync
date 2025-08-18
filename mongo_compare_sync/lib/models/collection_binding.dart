@@ -1,5 +1,3 @@
-import 'package:mongo_compare_sync/models/collection_compare_result.dart';
-
 /// 比较结果信息类
 class ComparisonResultInfo {
   final bool isCompleted; // 比较是否完成

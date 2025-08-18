@@ -1,12 +1,7 @@
 import 'package:flutter/material.dart';
-import 'dart:math' as math;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:mongo_dart/mongo_dart.dart' hide Size;
 import '../models/connection.dart';
-import '../models/document.dart';
-import '../models/collection_compare_result.dart';
 import '../models/collection_binding.dart';
-import '../screens/document_tree_comparison_screen.dart';
 import '../services/mongo_service.dart';
 import '../widgets/database_collection_panel.dart';
 import '../widgets/binding_list_button.dart';

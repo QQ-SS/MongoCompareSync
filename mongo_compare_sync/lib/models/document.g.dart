@@ -42,10 +42,3 @@ Map<String, dynamic> _$DocumentDiffToJson(DocumentDiff instance) =>
       'targetDocument': instance.targetDocument,
       'fieldDiffs': instance.fieldDiffs,
     };
-
-const _$DocumentDiffTypeEnumMap = {
-  DocumentDiffType.added: 'added',
-  DocumentDiffType.removed: 'removed',
-  DocumentDiffType.modified: 'modified',
-  DocumentDiffType.unchanged: 'unchanged',
-};

@@ -1,10 +1,9 @@
 import 'dart:async';
-import 'dart:io'; // 引入dart:io以使用File
+// 引入dart:io以使用File
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart'; // 仍然需要获取应用文档目录
+// 仍然需要获取应用文档目录
 import 'screens/home_screen.dart';
 import 'repositories/settings_repository.dart'; // 引入SettingsRepository
 import 'services/mongo_service.dart'; // 引入MongoService

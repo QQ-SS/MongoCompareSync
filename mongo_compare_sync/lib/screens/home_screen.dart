@@ -5,7 +5,6 @@ import '../screens/compare_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/rule_list_screen.dart';
 import '../widgets/responsive_layout.dart';
-import '../services/platform_service.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -38,9 +37,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final platformService = PlatformService.instance;
-    final isLargeScreen = ResponsiveLayoutUtil.isLargeScreen(context);
-    final isMediumScreen = ResponsiveLayoutUtil.isMediumScreen(context);
+    ResponsiveLayoutUtil.isLargeScreen(context);
+    ResponsiveLayoutUtil.isMediumScreen(context);
 
     // 为大屏幕创建侧边导航栏
     Widget buildNavigationRail() {

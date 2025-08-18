@@ -52,10 +52,10 @@ class _SkeletonLoaderState extends State<SkeletonLoader>
   Widget build(BuildContext context) {
     final baseColor =
         widget.baseColor ??
-        Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.2);
+        Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.2);
     final highlightColor =
         widget.highlightColor ??
-        Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5);
+        Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5);
 
     return AnimatedBuilder(
       animation: _animation,

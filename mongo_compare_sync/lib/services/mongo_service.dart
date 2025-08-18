@@ -3,9 +3,6 @@ import 'package:mongo_dart/mongo_dart.dart';
 import '../models/connection.dart';
 import '../models/collection.dart';
 import '../models/document.dart';
-import '../models/sync_result.dart';
-import '../models/compare_rule.dart';
-import '../models/collection_compare_result.dart';
 import 'log_service.dart';
 
 class MongoService {
@@ -89,17 +86,12 @@ class MongoService {
 
       // 根据日志，databasesInfo 是一个字符串列表: [SqlSugarDb, admin, config, local, testDB]
       // 直接转换为字符串列表
-      if (databasesInfo is List) {
-        LogService.instance.info('处理List类型数据，长度: ${databasesInfo.length}');
+      LogService.instance.info('处理List类型数据，长度: ${databasesInfo.length}');
 
-        // 将所有项目转换为字符串
-        allDatabases = databasesInfo.map((item) => item.toString()).toList();
-        LogService.instance.info('转换后的数据库列表: $allDatabases');
-      } else {
-        LogService.instance.info('非List类型数据，直接转换为字符串');
-        allDatabases = [databasesInfo.toString()];
-      }
-
+      // 将所有项目转换为字符串
+      allDatabases = databasesInfo.map((item) => item.toString()).toList();
+      LogService.instance.info('转换后的数据库列表: $allDatabases');
+    
       LogService.instance.info('所有数据库: $allDatabases');
 
       // 过滤用户数据库

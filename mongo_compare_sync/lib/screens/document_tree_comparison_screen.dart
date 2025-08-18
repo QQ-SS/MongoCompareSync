@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mongo_dart/mongo_dart.dart' hide Center;
 import '../models/document.dart';
 import '../services/mongo_service.dart';
-import '../models/collection_compare_result.dart';
 
 class DocumentTreeComparisonScreen extends ConsumerStatefulWidget {
   final List<DocumentDiff> results;
@@ -72,67 +71,6 @@ class _DocumentTreeComparisonScreenState
   }
 
   // 重新比较文档
-  Future<void> _recompareDocuments() async {
-    if (_sourceDocuments.isEmpty || _targetDocuments.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('请先加载文档数据')));
-      return;
-    }
-
-    setState(() {
-      _isProcessing = true;
-      _processingMessage = '正在重新比较文档...';
-    });
-
-    try {
-      // 更新差异状态
-      for (int i = 0; i < widget.results.length; i++) {
-        final docId = widget.results[i].id;
-        final sourceDoc = _sourceDocuments[docId];
-        final targetDoc = _targetDocuments[docId];
-
-        if (sourceDoc != null && targetDoc != null) {
-          // 比较文档字段
-          final fieldDiffs = <String, FieldDiff>{};
-          _compareDocument(sourceDoc, targetDoc, '', fieldDiffs);
-
-          widget.results[i] = DocumentDiff(
-            id: widget.results[i].id,
-            sourceDocument: widget.results[i].sourceDocument,
-            targetDocument: widget.results[i].targetDocument,
-            fieldDiffs: fieldDiffs,
-          );
-        } else if (sourceDoc != null && targetDoc == null) {
-          widget.results[i] = DocumentDiff(
-            id: widget.results[i].id,
-            sourceDocument: widget.results[i].sourceDocument,
-            targetDocument: widget.results[i].targetDocument,
-            fieldDiffs: {},
-          );
-        } else if (sourceDoc == null && targetDoc != null) {
-          widget.results[i] = DocumentDiff(
-            id: widget.results[i].id,
-            sourceDocument: widget.results[i].sourceDocument,
-            targetDocument: widget.results[i].targetDocument,
-            fieldDiffs: {},
-          );
-        }
-      }
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('文档比较已更新')));
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('重新比较文档失败: $e')));
-    } finally {
-      setState(() {
-        _isProcessing = false;
-      });
-    }
-  }
 
   // 加载完整文档数据
   Future<void> _loadDocuments() async {
@@ -656,7 +594,7 @@ class _DocumentTreeComparisonScreenState
           isExpandable = true;
           nestedData = {};
           for (int i = 0; i < value.length; i++) {
-            nestedData!['[$i]'] = value[i];
+            nestedData['[$i]'] = value[i];
           }
         }
       } else {
@@ -810,7 +748,7 @@ class _DocumentTreeComparisonScreenState
           isExpandable = true;
           nestedData = {};
           for (int i = 0; i < value.length; i++) {
-            nestedData!['[$i]'] = value[i];
+            nestedData['[$i]'] = value[i];
           }
         }
       } else {
@@ -1107,13 +1045,6 @@ class _DocumentTreeComparisonScreenState
       }
     }
 
-    if (targetDoc == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('目标文档数据不可用')));
-      return;
-    }
-
     // 确认对话框
     final confirmed = await showDialog<bool>(
       context: context,
@@ -1142,7 +1073,7 @@ class _DocumentTreeComparisonScreenState
 
     try {
       // 获取源文档的数据库和集合名称
-      final diff = widget.results.firstWhere((d) => d.id == docId);
+      widget.results.firstWhere((d) => d.id == docId);
 
       // 复制文档
       await widget.mongoService.updateDocument(
@@ -1356,13 +1287,6 @@ class _DocumentTreeComparisonScreenState
         ).showSnackBar(SnackBar(content: Text('加载源文档失败: $e')));
         return;
       }
-    }
-
-    if (sourceDoc == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('源文档数据不可用')));
-      return;
     }
 
     // 确认对话框

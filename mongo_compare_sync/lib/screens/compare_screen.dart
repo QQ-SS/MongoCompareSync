@@ -1,22 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/collection_binding.dart';
+
 import '../models/connection.dart';
-import '../models/collection.dart';
-import '../models/document.dart';
-import '../models/compare_rule.dart';
 import '../providers/connection_provider.dart' hide ConnectionState;
-import '../providers/rule_provider.dart';
-import '../widgets/database_browser.dart';
-import '../widgets/drag_drop_compare_view.dart';
-import '../widgets/responsive_layout.dart';
-import '../widgets/loading_indicator.dart';
-import '../widgets/skeleton_loader.dart';
-import '../services/platform_service.dart';
 import '../services/log_service.dart';
-import 'rule_list_screen.dart';
-import '../repositories/connection_repository.dart';
+import '../widgets/drag_drop_compare_view.dart';
+import '../widgets/loading_indicator.dart';
 
 class CompareScreen extends ConsumerStatefulWidget {
   const CompareScreen({super.key});
@@ -26,82 +16,6 @@ class CompareScreen extends ConsumerStatefulWidget {
 }
 
 class _CompareScreenState extends ConsumerState<CompareScreen> {
-  MongoConnection? _sourceConnection;
-  MongoConnection? _targetConnection;
-  String? _sourceDatabase;
-  String? _targetDatabase;
-  String? _sourceCollection;
-  String? _targetCollection;
-  bool _isComparing = false;
-  String? _error;
-  List<DocumentDiff>? _comparisonResults;
-  CompareRule? _selectedRule;
-
-  List<CollectionBinding> _dragDropBindings = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _loadConnections();
-  }
-
-  void _loadConnections() {
-    // 不自动设置连接，让用户手动选择
-    // 这样可以避免使用过期的连接ID
-  }
-
-  void _handleSourceConnectionChanged(MongoConnection? connection) {
-    setState(() {
-      _sourceConnection = connection;
-      _sourceDatabase = null;
-      _sourceCollection = null;
-    });
-  }
-
-  void _handleTargetConnectionChanged(MongoConnection? connection) {
-    setState(() {
-      _targetConnection = connection;
-      _targetDatabase = null;
-      _targetCollection = null;
-    });
-  }
-
-  void _handleSourceCollectionSelected(String database, String collection) {
-    setState(() {
-      _sourceDatabase = database;
-      _sourceCollection = collection;
-    });
-  }
-
-  void _handleTargetCollectionSelected(String database, String collection) {
-    setState(() {
-      _targetDatabase = database;
-      _targetCollection = collection;
-    });
-  }
-
-  void _handleBindingsChanged(List<CollectionBinding> bindings) {
-    setState(() {
-      _dragDropBindings = bindings;
-    });
-  }
-
-  void _handleCompareBinding(CollectionBinding binding) {}
-
-  Future<void> _compareCollections() async {
-    if (_sourceConnection == null ||
-        _targetConnection == null ||
-        _sourceDatabase == null ||
-        _targetDatabase == null ||
-        _sourceCollection == null ||
-        _targetCollection == null) {
-      setState(() {
-        _error = '请选择源和目标集合';
-      });
-      return;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final connectionsState = ref.watch(connectionsProvider);
@@ -211,6 +125,12 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
     );
   }
 
+  @override
+  void initState() {
+    super.initState();
+    _loadConnections();
+  }
+
   Widget _buildDragDropCompareView(List<MongoConnection> allConnections) {
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -222,53 +142,8 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
     );
   }
 
-  Widget _buildConnectionDropdown({
-    required String label,
-    required MongoConnection? selectedConnection,
-    required List<MongoConnection> connections,
-    required Function(MongoConnection?) onConnectionChanged,
-  }) {
-    final uniqueConnections = <String, MongoConnection>{};
-    for (final conn in connections) {
-      uniqueConnections[conn.id] = conn;
-    }
-    final uniqueConnectionsList = uniqueConnections.values.toList();
-
-    final selectedConnectionExists = selectedConnection == null
-        ? false
-        : uniqueConnections.containsKey(selectedConnection.id);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: Theme.of(context).textTheme.titleSmall),
-        const SizedBox(height: 8),
-        DropdownButtonFormField<String?>(
-          value: selectedConnectionExists ? selectedConnection.id : null,
-          decoration: InputDecoration(
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-            hintText: '选择连接',
-          ),
-          items: uniqueConnectionsList.map((conn) {
-            return DropdownMenuItem<String?>(
-              value: conn.id,
-              child: Text(conn.name),
-            );
-          }).toList(),
-          onChanged: (value) {
-            if (value != null) {
-              final connection = uniqueConnectionsList.firstWhere(
-                (conn) => conn.id == value,
-                orElse: () => uniqueConnectionsList.first,
-              );
-              onConnectionChanged(connection);
-            } else {
-              onConnectionChanged(null);
-            }
-          },
-        ),
-      ],
-    );
+  void _loadConnections() {
+    // 不自动设置连接，让用户手动选择
+    // 这样可以避免使用过期的连接ID
   }
 }
