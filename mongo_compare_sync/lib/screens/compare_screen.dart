@@ -216,17 +216,7 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          Expanded(
-            child: DragDropCompareView(
-              connections: allConnections,
-              sourceConnection: _sourceConnection,
-              targetConnection: _targetConnection,
-              onSourceConnectionChanged: _handleSourceConnectionChanged,
-              onTargetConnectionChanged: _handleTargetConnectionChanged,
-              onBindingsChanged: _handleBindingsChanged,
-              onCompareBinding: _handleCompareBinding,
-            ),
-          ),
+          Expanded(child: DragDropCompareView(connections: allConnections)),
         ],
       ),
     );

@@ -1,23 +1,28 @@
 import 'package:flutter/material.dart';
 import '../models/collection_binding.dart';
+import '../models/connection.dart';
+import '../screens/document_tree_comparison_screen.dart';
+import '../services/mongo_service.dart';
 
 class BindingListButton extends StatefulWidget {
   final List<CollectionBinding> bindings;
+  final MongoService mongoService;
+  final MongoConnection? sourceConnection;
+  final MongoConnection? targetConnection;
   final Function(CollectionBinding) onRemoveBinding;
-  final Function(CollectionBinding) onNavigateToComparison;
   final Function(CollectionBinding) onScrollToBinding;
   final Function() onClearAllBindings;
-  final Function() onCompareAllBindings;
 
   const BindingListButton({
-    Key? key,
+    super.key,
     required this.bindings,
+    required this.mongoService,
+    required this.sourceConnection,
+    required this.targetConnection,
     required this.onRemoveBinding,
-    required this.onNavigateToComparison,
     required this.onScrollToBinding,
     required this.onClearAllBindings,
-    required this.onCompareAllBindings,
-  }) : super(key: key);
+  });
 
   @override
   State<BindingListButton> createState() => _BindingListButtonState();
@@ -97,7 +102,7 @@ class _BindingListButtonState extends State<BindingListButton> {
                       label: const Text('清空'),
                     ),
                     TextButton.icon(
-                      onPressed: widget.onCompareAllBindings,
+                      onPressed: onCompareAllBindings,
                       icon: const Icon(Icons.play_arrow),
                       label: const Text('批量比较'),
                     ),
@@ -145,8 +150,7 @@ class _BindingListButtonState extends State<BindingListButton> {
                         ),
                         IconButton(
                           icon: const Icon(Icons.play_arrow),
-                          onPressed: () =>
-                              widget.onNavigateToComparison(binding),
+                          onPressed: () => onNavigateToComparison(binding),
                           tooltip: '执行比较',
                         ),
                         // 滚动到可见区域按钮
@@ -163,6 +167,28 @@ class _BindingListButtonState extends State<BindingListButton> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> onCompareAllBindings() async {}
+
+  // 导航到比较结果页面
+  Future<void> onNavigateToComparison(CollectionBinding binding) async {
+    // 导航到比较结果页面 - 使用新的文档树比较界面
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => DocumentTreeComparisonScreen(
+          results: [],
+          sourceCollection: binding.sourceCollection,
+          targetCollection: binding.targetCollection,
+          sourceDatabaseName: binding.sourceDatabase,
+          targetDatabaseName: binding.targetDatabase,
+          mongoService: widget.mongoService,
+          sourceConnectionId: widget.sourceConnection?.id,
+          targetConnectionId: widget.targetConnection?.id,
+          ignoredFields: [], // 可以从设置中获取忽略字段
         ),
       ),
     );

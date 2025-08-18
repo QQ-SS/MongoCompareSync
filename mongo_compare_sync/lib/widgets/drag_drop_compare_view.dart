@@ -13,23 +13,8 @@ import '../widgets/binding_list_button.dart';
 
 class DragDropCompareView extends ConsumerStatefulWidget {
   final List<MongoConnection> connections;
-  final MongoConnection? sourceConnection;
-  final MongoConnection? targetConnection;
-  final Function(MongoConnection?) onSourceConnectionChanged;
-  final Function(MongoConnection?) onTargetConnectionChanged;
-  final Function(List<CollectionBinding>) onBindingsChanged;
-  final Function(CollectionBinding) onCompareBinding;
 
-  const DragDropCompareView({
-    super.key,
-    required this.connections,
-    required this.sourceConnection,
-    required this.targetConnection,
-    required this.onSourceConnectionChanged,
-    required this.onTargetConnectionChanged,
-    required this.onBindingsChanged,
-    required this.onCompareBinding,
-  });
+  const DragDropCompareView({super.key, required this.connections});
 
   @override
   ConsumerState<DragDropCompareView> createState() =>
@@ -42,16 +27,13 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
   final GlobalKey<DatabaseCollectionPanelState> _sourceKey = GlobalKey();
   final GlobalKey<DatabaseCollectionPanelState> _targetKey = GlobalKey();
   final GlobalKey _painterKey = GlobalKey();
-  // 存储比较结果，包含状态和详细信息
-  Map<String, ComparisonResultInfo> _comparisonResults = {};
-  // 存储详细比较结果，用于导航到比较结果页面
-  Map<String, CollectionCompareResult> _detailedResults = {};
   // MongoDB服务实例
   final MongoService _mongoService = MongoService();
+  MongoConnection? _sourceConnection;
+  MongoConnection? _targetConnection;
 
   Widget _buildConnectionDropdown({
     required String label,
-    required MongoConnection? selectedConnection,
     required List<MongoConnection> connections,
     required Function(MongoConnection?) onConnectionChanged,
   }) {
@@ -61,17 +43,13 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
     }
     final uniqueConnectionsList = uniqueConnections.values.toList();
 
-    final selectedConnectionExists = selectedConnection == null
-        ? false
-        : uniqueConnections.containsKey(selectedConnection.id);
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
         DropdownButtonFormField<String?>(
-          value: selectedConnectionExists ? selectedConnection.id : null,
+          // value:selectedConnection.id,
           decoration: InputDecoration(
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             contentPadding: const EdgeInsets.symmetric(horizontal: 16),
@@ -111,9 +89,8 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                 flex: 2,
                 child: _buildConnectionDropdown(
                   label: '源连接',
-                  selectedConnection: widget.sourceConnection,
                   connections: widget.connections,
-                  onConnectionChanged: widget.onSourceConnectionChanged,
+                  onConnectionChanged: onSourceConnectionChanged,
                 ),
               ),
               const Spacer(flex: 1),
@@ -121,9 +98,8 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                 flex: 2,
                 child: _buildConnectionDropdown(
                   label: '目标连接',
-                  selectedConnection: widget.targetConnection,
                   connections: widget.connections,
-                  onConnectionChanged: widget.onTargetConnectionChanged,
+                  onConnectionChanged: onTargetConnectionChanged,
                 ),
               ),
             ],
@@ -141,7 +117,7 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                             flex: 2,
                             child: DatabaseCollectionPanel(
                               key: _sourceKey,
-                              connection: widget.sourceConnection,
+                              connection: _sourceConnection,
                               type: PanelType.source,
                               onBindingCheck: _isSourceBound,
                             ),
@@ -151,7 +127,7 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                             flex: 2,
                             child: DatabaseCollectionPanel(
                               key: _targetKey,
-                              connection: widget.targetConnection,
+                              connection: _targetConnection,
                               type: PanelType.target,
                               onDragAccept: _createBinding,
                               onBindingCheck: _isTargetBound,
@@ -179,11 +155,12 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                     Positioned.fill(
                       child: BindingListButton(
                         bindings: _bindings,
+                        mongoService: _mongoService,
+                        sourceConnection: _sourceConnection,
+                        targetConnection: _targetConnection,
                         onRemoveBinding: _removeBinding,
-                        onNavigateToComparison: _navigateToComparisonResult,
                         onScrollToBinding: _scrollBindingToVisible,
                         onClearAllBindings: _clearAllBindings,
-                        onCompareAllBindings: _compareAllBindings,
                       ),
                     ),
                   ],
@@ -194,6 +171,18 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
         ],
       ),
     );
+  }
+
+  void onSourceConnectionChanged(MongoConnection? connection) {
+    setState(() {
+      _sourceConnection = connection;
+    });
+  }
+
+  void onTargetConnectionChanged(MongoConnection? connection) {
+    setState(() {
+      _targetConnection = connection;
+    });
   }
 
   void _createBinding(
@@ -212,130 +201,19 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
       setState(() {
         _bindings.add(binding);
       });
-      widget.onBindingsChanged(_bindings);
     }
   }
 
   void _removeBinding(CollectionBinding binding) {
     setState(() {
       _bindings.remove(binding);
-      // 同时移除比较结果
-      _comparisonResults.remove(binding.id);
-      _detailedResults.remove(binding.id);
     });
-    widget.onBindingsChanged(_bindings);
   }
 
   void _clearAllBindings() {
     setState(() {
       _bindings.clear();
-      _comparisonResults.clear();
-      _detailedResults.clear();
     });
-    widget.onBindingsChanged(_bindings);
-  }
-
-  // 比较单个绑定
-  Future<void> _compareBinding(CollectionBinding binding) async {
-    // 设置比较状态为进行中
-    setState(() {
-      _comparisonResults[binding.id] = ComparisonResultInfo(isCompleted: false);
-    });
-
-    try {
-      // 执行比较
-      widget.onCompareBinding(binding);
-    } catch (e) {
-      // 处理错误
-      if (mounted) {
-        setState(() {
-          _comparisonResults[binding.id] = ComparisonResultInfo(
-            isCompleted: true,
-            sameCount: 0,
-            diffCount: 0,
-          );
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('比较失败: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  // 批量比较所有绑定
-  Future<void> _compareAllBindings() async {
-    if (_bindings.isEmpty) return;
-
-    // 显示一个短暂的提示
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('开始批量比较...'),
-        duration: Duration(seconds: 1),
-      ),
-    );
-
-    // 确保连接已建立
-    if (widget.sourceConnection != null && widget.targetConnection != null) {
-      try {
-        await _mongoService.connect(widget.sourceConnection!);
-        await _mongoService.connect(widget.targetConnection!);
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('连接失败: ${e.toString()}'),
-              backgroundColor: Colors.red,
-            ),
-          );
-          return;
-        }
-      }
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('请先选择源连接和目标连接'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-    }
-
-    // 对所有绑定进行比较
-    for (final binding in _bindings) {
-      await _compareBinding(binding);
-    }
-
-    // 显示比较完成提示
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('批量比较完成'), duration: Duration(seconds: 1)),
-      );
-    }
-  }
-
-  // 导航到比较结果页面
-  Future<void> _navigateToComparisonResult(CollectionBinding binding) async {
-    // 导航到比较结果页面 - 使用新的文档树比较界面
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => DocumentTreeComparisonScreen(
-          results: [],
-          sourceCollection: binding.sourceCollection,
-          targetCollection: binding.targetCollection,
-          sourceDatabaseName: binding.sourceDatabase,
-          targetDatabaseName: binding.targetDatabase,
-          mongoService: _mongoService,
-          sourceConnectionId: widget.sourceConnection?.id,
-          targetConnectionId: widget.targetConnection?.id,
-          ignoredFields: [], // 可以从设置中获取忽略字段
-        ),
-      ),
-    );
   }
 
   // 滚动单个绑定到可见区域
