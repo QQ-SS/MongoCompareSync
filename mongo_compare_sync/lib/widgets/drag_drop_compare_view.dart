@@ -5,7 +5,6 @@ import 'package:mongo_dart/mongo_dart.dart' hide Size;
 import '../models/connection.dart';
 import '../models/document.dart';
 import '../models/collection_compare_result.dart';
-import '../screens/comparison_result_screen.dart';
 import '../screens/document_tree_comparison_screen.dart';
 import '../services/mongo_service.dart';
 import '../widgets/database_collection_panel.dart';
@@ -459,44 +458,6 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
     try {
       // 执行比较
       widget.onCompareBinding(binding);
-
-      // 使用新的详细比较算法
-      if (widget.sourceConnection != null && widget.targetConnection != null) {
-        // 确保连接已建立
-        await _mongoService.connect(widget.sourceConnection!);
-        await _mongoService.connect(widget.targetConnection!);
-
-        final compareResult = await _mongoService.compareCollectionsDetailed(
-          widget.sourceConnection!.id,
-          binding.sourceDatabase,
-          binding.sourceCollection,
-          widget.targetConnection!.id,
-          binding.targetDatabase,
-          binding.targetCollection,
-          config: CompareConfig(
-            idField: '_id', // 默认使用 _id 字段
-            ignoreFields: [], // 可以从设置中获取忽略字段
-            caseSensitive: true, // 区分大小写
-          ),
-        );
-
-        // 保存详细比较结果
-        _detailedResults[binding.id] = compareResult;
-
-        // 更新比较结果状态
-        if (mounted) {
-          setState(() {
-            _comparisonResults[binding.id] = ComparisonResultInfo(
-              isCompleted: true,
-              sameCount: compareResult.sameDocumentsCount,
-              diffCount:
-                  compareResult.differentDocumentsCount +
-                  compareResult.sourceOnlyIds.length +
-                  compareResult.targetOnlyIds.length,
-            );
-          });
-        }
-      }
     } catch (e) {
       // 处理错误
       if (mounted) {
@@ -572,146 +533,11 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
 
   // 导航到比较结果页面
   Future<void> _navigateToComparisonResult(CollectionBinding binding) async {
-    // 如果比较结果尚未完成，先执行比较
-    if (!_comparisonResults.containsKey(binding.id) ||
-        !_comparisonResults[binding.id]!.isCompleted) {
-      await _compareBinding(binding);
-    }
-
-    // 检查是否有详细比较结果
-    if (!_detailedResults.containsKey(binding.id)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('比较结果不可用，请重新执行比较'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    final compareResult = _detailedResults[binding.id]!;
-
-    // 将详细比较结果转换为DocumentDiff列表
-    final List<DocumentDiff> diffs = [];
-
-    // 处理不同的文档
-    for (var entry in compareResult.documentResults.entries) {
-      final id = entry.key;
-      final result = entry.value;
-
-      if (!result.isIdentical) {
-        // 创建字段差异映射
-        final Map<String, dynamic> fieldDiffs = {};
-        for (var fieldEntry in result.fieldResults.entries) {
-          final fieldPath = fieldEntry.key;
-          final fieldResult = fieldEntry.value;
-
-          if (!fieldResult.isIdentical) {
-            fieldDiffs[fieldPath] = {
-              'source': fieldResult.sourceValue,
-              'target': fieldResult.targetValue,
-            };
-          }
-        }
-
-        // 创建源文档和目标文档，确保ID是有效的ObjectId格式
-        // 尝试创建一个ObjectId对象来验证格式
-        ObjectId? objectId;
-        try {
-          objectId = ObjectId.parse(id);
-        } catch (e) {
-          print('ID格式无效，无法解析为ObjectId: $id');
-          // 如果无法解析为ObjectId，我们可以创建一个新的ObjectId
-          objectId = ObjectId();
-        }
-
-        final sourceDoc = MongoDocument(
-          id: objectId.toString(),
-          data: {'_id': objectId}, // 使用ObjectId对象
-          collectionName: binding.sourceCollection,
-          databaseName: binding.sourceDatabase,
-          connectionId: widget.sourceConnection?.id ?? 'unknown',
-        );
-
-        final targetDoc = MongoDocument(
-          id: objectId.toString(),
-          data: {'_id': objectId}, // 使用ObjectId对象
-          collectionName: binding.targetCollection,
-          databaseName: binding.targetDatabase,
-          connectionId: widget.targetConnection?.id ?? 'unknown',
-        );
-
-        // 创建文档差异对象
-        diffs.add(
-          DocumentDiff(
-            sourceDocument: sourceDoc,
-            targetDocument: targetDoc,
-            diffType: DocumentDiffType.modified,
-            fieldDiffs: fieldDiffs,
-          ),
-        );
-      }
-    }
-
-    // 处理只在源集合中存在的文档
-    for (var id in compareResult.sourceOnlyIds) {
-      final sourceDoc = MongoDocument(
-        id: id,
-        data: {'_id': id}, // 这里只有ID，实际数据需要从MongoDB获取
-        collectionName: binding.sourceCollection,
-        databaseName: binding.sourceDatabase,
-        connectionId: widget.sourceConnection?.id ?? 'unknown',
-      );
-
-      final targetDoc = MongoDocument(
-        id: id,
-        data: {}, // 目标中不存在此文档
-        collectionName: binding.targetCollection,
-        databaseName: binding.targetDatabase,
-        connectionId: widget.targetConnection?.id ?? 'unknown',
-      );
-
-      diffs.add(
-        DocumentDiff(
-          sourceDocument: sourceDoc,
-          targetDocument: targetDoc,
-          diffType: DocumentDiffType.added,
-        ),
-      );
-    }
-
-    // 处理只在目标集合中存在的文档
-    for (var id in compareResult.targetOnlyIds) {
-      final sourceDoc = MongoDocument(
-        id: id,
-        data: {}, // 源中不存在此文档
-        collectionName: binding.sourceCollection,
-        databaseName: binding.sourceDatabase,
-        connectionId: widget.sourceConnection?.id ?? 'unknown',
-      );
-
-      final targetDoc = MongoDocument(
-        id: id,
-        data: {'_id': id}, // 这里只有ID，实际数据需要从MongoDB获取
-        collectionName: binding.targetCollection,
-        databaseName: binding.targetDatabase,
-        connectionId: widget.targetConnection?.id ?? 'unknown',
-      );
-
-      diffs.add(
-        DocumentDiff(
-          sourceDocument: sourceDoc,
-          targetDocument: targetDoc,
-          diffType: DocumentDiffType.removed,
-        ),
-      );
-    }
-
     // 导航到比较结果页面 - 使用新的文档树比较界面
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => DocumentTreeComparisonScreen(
-          results: diffs,
+          results: [],
           sourceCollection: binding.sourceCollection,
           targetCollection: binding.targetCollection,
           sourceDatabaseName: binding.sourceDatabase,

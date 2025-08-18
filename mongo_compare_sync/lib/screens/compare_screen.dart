@@ -14,7 +14,6 @@ import '../widgets/loading_indicator.dart';
 import '../widgets/skeleton_loader.dart';
 import '../services/platform_service.dart';
 import '../services/log_service.dart';
-import 'comparison_result_screen.dart';
 import 'rule_list_screen.dart';
 import '../repositories/connection_repository.dart';
 
@@ -86,14 +85,7 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
     });
   }
 
-  void _handleCompareBinding(CollectionBinding binding) {
-    _compareSpecificCollections(
-      binding.sourceDatabase,
-      binding.sourceCollection,
-      binding.targetDatabase,
-      binding.targetCollection,
-    );
-  }
+  void _handleCompareBinding(CollectionBinding binding) {}
 
   Future<void> _compareCollections() async {
     if (_sourceConnection == null ||
@@ -106,73 +98,6 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
         _error = '请选择源和目标集合';
       });
       return;
-    }
-
-    await _compareSpecificCollections(
-      _sourceDatabase!,
-      _sourceCollection!,
-      _targetDatabase!,
-      _targetCollection!,
-    );
-  }
-
-  Future<void> _compareSpecificCollections(
-    String sourceDatabase,
-    String sourceCollection,
-    String targetDatabase,
-    String targetCollection,
-  ) async {
-    if (_sourceConnection == null || _targetConnection == null) {
-      setState(() {
-        _error = '请选择源和目标连接';
-      });
-      return;
-    }
-
-    setState(() {
-      _isComparing = true;
-      _error = null;
-      _comparisonResults = null;
-    });
-
-    try {
-      final mongoService = ref.read(mongoServiceProvider);
-      final results = await mongoService.compareCollections(
-        _sourceConnection!.id,
-        sourceDatabase,
-        sourceCollection,
-        _targetConnection!.id,
-        targetDatabase,
-        targetCollection,
-        fieldRules: _selectedRule?.fieldRules,
-      );
-
-      setState(() {
-        _comparisonResults = results;
-        _isComparing = false;
-      });
-
-      if (results.isNotEmpty) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => ComparisonResultScreen(
-              results: results,
-              sourceCollection: '$sourceDatabase.$sourceCollection',
-              targetCollection: '$targetDatabase.$targetCollection',
-            ),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('没有发现差异')));
-      }
-    } catch (e) {
-      LogService.instance.error('比较集合失败', e);
-      setState(() {
-        _error = '比较失败: ${e.toString()}';
-        _isComparing = false;
-      });
     }
   }
 

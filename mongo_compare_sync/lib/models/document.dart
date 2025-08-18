@@ -45,15 +45,15 @@ enum DocumentDiffType { added, removed, modified, unchanged }
 
 @JsonSerializable()
 class DocumentDiff {
-  final MongoDocument sourceDocument;
-  final MongoDocument? targetDocument;
-  final DocumentDiffType diffType;
+  final String id;
+  final Map<String, dynamic>? sourceDocument;
+  final Map<String, dynamic>? targetDocument;
   final Map<String, dynamic>? fieldDiffs;
 
   DocumentDiff({
-    required this.sourceDocument,
+    required this.id,
+    this.sourceDocument,
     this.targetDocument,
-    required this.diffType,
     this.fieldDiffs,
   });
 
@@ -63,15 +63,15 @@ class DocumentDiff {
   Map<String, dynamic> toJson() => _$DocumentDiffToJson(this);
 
   DocumentDiff copyWith({
-    MongoDocument? sourceDocument,
-    MongoDocument? targetDocument,
-    DocumentDiffType? diffType,
+    String? id,
+    Map<String, dynamic>? sourceDocument,
+    Map<String, dynamic>? targetDocument,
     Map<String, dynamic>? fieldDiffs,
   }) {
     return DocumentDiff(
+      id: id ?? this.id,
       sourceDocument: sourceDocument ?? this.sourceDocument,
       targetDocument: targetDocument ?? this.targetDocument,
-      diffType: diffType ?? this.diffType,
       fieldDiffs: fieldDiffs ?? this.fieldDiffs,
     );
   }
@@ -109,39 +109,5 @@ class FieldDiff {
       'targetValue': targetValue,
       'status': status,
     };
-  }
-}
-
-extension DocumentDiffExtension on DocumentDiff {
-  String get id => sourceDocument.id;
-
-  String get status {
-    switch (diffType) {
-      case DocumentDiffType.added:
-        return 'added';
-      case DocumentDiffType.removed:
-        return 'removed';
-      case DocumentDiffType.modified:
-        return 'modified';
-      case DocumentDiffType.unchanged:
-        return 'unchanged';
-      default:
-        return 'unknown';
-    }
-  }
-
-  // 获取字段差异列表
-  List<FieldDiff> get fieldDiffList {
-    final List<FieldDiff> result = [];
-
-    if (fieldDiffs != null) {
-      fieldDiffs!.forEach((path, diff) {
-        if (diff is Map<String, dynamic>) {
-          result.add(FieldDiff.fromMap(path, diff));
-        }
-      });
-    }
-
-    return result;
   }
 }
