@@ -168,7 +168,7 @@ class _DocumentTreeComparisonScreenState
     try {
       widget.results.clear();
       // 取源、目标文档的所有id并集，然后进行比较
-      final ids = [..._sourceDocuments.keys, ..._targetDocuments.keys];
+      final ids = {..._sourceDocuments.keys, ..._targetDocuments.keys}.toList();
       // 更新差异状态
       for (int i = 0; i < ids.length; i++) {
         final docId = ids[i];
