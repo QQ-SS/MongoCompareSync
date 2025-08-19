@@ -1183,6 +1183,9 @@ class _DocumentTreeComparisonScreenState
         _sourceDocuments[docId] = Map<String, dynamic>.from(targetDoc);
       });
 
+      // 更新文档差异状态
+      _updateDocumentDiff(docId);
+
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('文档已复制到源')));
@@ -1236,6 +1239,9 @@ class _DocumentTreeComparisonScreenState
       setState(() {
         _sourceDocuments[docId] = updatedSourceDoc;
       });
+
+      // 更新文档差异状态
+      _updateDocumentDiff(docId);
 
       ScaffoldMessenger.of(
         context,
@@ -1294,6 +1300,9 @@ class _DocumentTreeComparisonScreenState
         _targetDocuments[docId] = Map<String, dynamic>.from(sourceDoc);
       });
 
+      // 更新文档差异状态
+      _updateDocumentDiff(docId);
+
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('文档已复制到目标')));
@@ -1348,6 +1357,9 @@ class _DocumentTreeComparisonScreenState
         _targetDocuments[docId] = updatedTargetDoc;
       });
 
+      // 更新文档差异状态
+      _updateDocumentDiff(docId);
+
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('字段 $fieldPath 已复制到目标')));
@@ -1359,6 +1371,48 @@ class _DocumentTreeComparisonScreenState
       setState(() {
         _isProcessing = false;
       });
+    }
+  }
+
+  // 更新文档差异状态
+  void _updateDocumentDiff(String docId) {
+    // 获取源文档和目标文档
+    final sourceDoc = _sourceDocuments[docId];
+    final targetDoc = _targetDocuments[docId];
+
+    // 如果两边都有文档，重新比较差异
+    if (sourceDoc != null && targetDoc != null) {
+      // 查找现有的差异记录
+      int index = widget.results.indexWhere((diff) => diff.id == docId);
+
+      // 重新计算字段差异
+      final fieldDiffs = <String, FieldDiff>{};
+      _compareDocument(sourceDoc, targetDoc, '', fieldDiffs);
+
+      // 更新差异记录
+      if (index >= 0) {
+        // 更新现有记录
+        setState(() {
+          widget.results[index] = DocumentDiff(
+            id: docId,
+            sourceDocument: sourceDoc,
+            targetDocument: targetDoc,
+            fieldDiffs: fieldDiffs,
+          );
+        });
+      } else {
+        // 添加新记录
+        setState(() {
+          widget.results.add(
+            DocumentDiff(
+              id: docId,
+              sourceDocument: sourceDoc,
+              targetDocument: targetDoc,
+              fieldDiffs: fieldDiffs,
+            ),
+          );
+        });
+      }
     }
   }
 
