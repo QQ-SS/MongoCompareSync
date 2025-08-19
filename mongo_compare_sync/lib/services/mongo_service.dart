@@ -91,7 +91,7 @@ class MongoService {
       // 将所有项目转换为字符串
       allDatabases = databasesInfo.map((item) => item.toString()).toList();
       LogService.instance.info('转换后的数据库列表: $allDatabases');
-    
+
       LogService.instance.info('所有数据库: $allDatabases');
 
       // 过滤用户数据库
@@ -226,12 +226,16 @@ class MongoService {
     String databaseName,
     String collectionName,
     ObjectId id,
-    SetField setField,
+    String fieldPath,
+    dynamic fieldValue,
   ) async {
     Db? targetDb;
     try {
       targetDb = await _getDbForDatabase(connectionId, databaseName);
-      await targetDb.collection(collectionName).update(where.id(id), setField);
+      await targetDb.collection(collectionName).update(
+        where.id(id),
+        <String, dynamic>{fieldPath: fieldValue},
+      );
       // LogService.instance.info(setField);
     } finally {
       await targetDb?.close();

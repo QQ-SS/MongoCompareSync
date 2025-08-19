@@ -241,14 +241,6 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
       binding.targetDatabase,
       binding.targetCollection,
     );
-
-    // 显示一个短暂的提示
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('已滚动到绑定的集合'),
-        duration: Duration(milliseconds: 500),
-      ),
-    );
   }
 
   bool _isSourceBound(String database, String collection) {

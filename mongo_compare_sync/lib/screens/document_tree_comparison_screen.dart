@@ -73,10 +73,6 @@ class _DocumentTreeComparisonScreenState
   // 从数据库重新加载数据
   Future<void> _reloadFromDatabase() async {
     await _loadDocuments();
-
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('已从数据库重新加载文档数据')));
   }
 
   // 重新比较文档
@@ -189,10 +185,6 @@ class _DocumentTreeComparisonScreenState
           ),
         );
       }
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('文档比较已更新')));
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -1089,10 +1081,6 @@ class _DocumentTreeComparisonScreenState
           setState(() {
             _sourceDocuments.remove(docId);
           });
-
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('源文档已删除')));
         }
       } catch (e) {
         ScaffoldMessenger.of(
@@ -1169,10 +1157,6 @@ class _DocumentTreeComparisonScreenState
 
       // 更新文档差异状态
       _updateDocumentDiff(docId);
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('字段 $fieldPath 已从源文档删除')));
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -1238,10 +1222,6 @@ class _DocumentTreeComparisonScreenState
           setState(() {
             _targetDocuments.remove(docId);
           });
-
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('目标文档已删除')));
         }
       } catch (e) {
         ScaffoldMessenger.of(
@@ -1318,10 +1298,6 @@ class _DocumentTreeComparisonScreenState
 
       // 更新文档差异状态
       _updateDocumentDiff(docId);
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('字段 $fieldPath 已从目标文档删除')));
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -1433,10 +1409,6 @@ class _DocumentTreeComparisonScreenState
 
       // 更新文档差异状态
       _updateDocumentDiff(docId);
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('文档已复制到源')));
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -1474,7 +1446,8 @@ class _DocumentTreeComparisonScreenState
         widget.sourceDatabaseName,
         widget.sourceCollection,
         objectId,
-        SetField(fieldPath, fieldValue),
+        fieldPath,
+        fieldValue,
       );
 
       // 更新本地数据
@@ -1486,10 +1459,6 @@ class _DocumentTreeComparisonScreenState
 
       // 更新文档差异状态
       _updateDocumentDiff(docId);
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('字段 $fieldPath 已复制到源')));
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -1546,10 +1515,6 @@ class _DocumentTreeComparisonScreenState
 
       // 更新文档差异状态
       _updateDocumentDiff(docId);
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('文档已复制到目标')));
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -1587,7 +1552,8 @@ class _DocumentTreeComparisonScreenState
         widget.targetDatabaseName,
         widget.targetCollection,
         objectId,
-        SetField(fieldPath, fieldValue),
+        fieldPath,
+        fieldValue,
       );
 
       // 更新本地数据
@@ -1599,10 +1565,6 @@ class _DocumentTreeComparisonScreenState
 
       // 更新文档差异状态
       _updateDocumentDiff(docId);
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('字段 $fieldPath 已复制到目标')));
     } catch (e) {
       ScaffoldMessenger.of(
         context,
