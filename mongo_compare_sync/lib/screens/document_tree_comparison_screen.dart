@@ -1042,12 +1042,88 @@ class _DocumentTreeComparisonScreenState
     final parts = _selectedSourcePath!.split('.');
     final docId = parts.first;
 
+    // 检查是否为文档级别操作
+    if (parts.length == 1) {
+      // 文档级别删除
+      // 确认删除
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('确认删除'),
+          content: Text('确定要删除源文档 $docId 吗？'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('删除'),
+              style: TextButton.styleFrom(
+                foregroundColor: Theme.of(context).colorScheme.error,
+              ),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true) return;
+
+      setState(() {
+        _isProcessing = true;
+        _processingMessage = '正在删除源文档...';
+      });
+
+      try {
+        if (widget.sourceConnectionId != null) {
+          // 将字符串ID转换为ObjectId
+          final objectId = _convertToObjectId(docId);
+          await _mongoService.deleteDocument(
+            widget.sourceConnectionId!,
+            widget.sourceDatabaseName,
+            widget.sourceCollection,
+            objectId,
+          );
+
+          // 更新本地数据
+          setState(() {
+            _sourceDocuments.remove(docId);
+          });
+
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('源文档已删除')));
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('删除源文档失败: $e')));
+      } finally {
+        setState(() {
+          _isProcessing = false;
+        });
+      }
+    } else {
+      // 字段级别删除
+      final fieldPath = parts.sublist(1).join('.');
+      await _deleteSourceField(docId, fieldPath);
+    }
+  }
+
+  // 删除源文档字段
+  Future<void> _deleteSourceField(String docId, String fieldPath) async {
+    if (widget.sourceConnectionId == null) return;
+
+    // 获取源文档
+    final sourceDoc = _sourceDocuments[docId];
+    if (sourceDoc == null) return;
+
     // 确认删除
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('确认删除'),
-        content: Text('确定要删除源文档 $docId 吗？'),
+        content: Text('确定要删除源文档 $docId 的字段 $fieldPath 吗？'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -1068,33 +1144,39 @@ class _DocumentTreeComparisonScreenState
 
     setState(() {
       _isProcessing = true;
-      _processingMessage = '正在删除源文档...';
+      _processingMessage = '正在删除源文档字段...';
     });
 
     try {
-      if (widget.sourceConnectionId != null) {
-        // 将字符串ID转换为ObjectId
-        final objectId = _convertToObjectId(docId);
-        await _mongoService.deleteDocument(
-          widget.sourceConnectionId!,
-          widget.sourceDatabaseName,
-          widget.sourceCollection,
-          objectId,
-        );
+      // 将字符串ID转换为ObjectId
+      final objectId = _convertToObjectId(docId);
 
-        // 更新本地数据
-        setState(() {
-          _sourceDocuments.remove(docId);
-        });
+      // 使用removeField方法删除字段
+      await _mongoService.removeField(
+        widget.sourceConnectionId!,
+        widget.sourceDatabaseName,
+        widget.sourceCollection,
+        objectId,
+        fieldPath,
+      );
 
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('源文档已删除')));
-      }
+      // 更新本地数据
+      final updatedSourceDoc = Map<String, dynamic>.from(sourceDoc);
+      _removeNestedField(updatedSourceDoc, fieldPath.split('.'));
+      setState(() {
+        _sourceDocuments[docId] = updatedSourceDoc;
+      });
+
+      // 更新文档差异状态
+      _updateDocumentDiff(docId);
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('字段 $fieldPath 已从源文档删除')));
     } catch (e) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('删除源文档失败: $e')));
+      ).showSnackBar(SnackBar(content: Text('删除源文档字段失败: $e')));
     } finally {
       setState(() {
         _isProcessing = false;
@@ -1109,12 +1191,88 @@ class _DocumentTreeComparisonScreenState
     final parts = _selectedTargetPath!.split('.');
     final docId = parts.first;
 
+    // 检查是否为文档级别操作
+    if (parts.length == 1) {
+      // 文档级别删除
+      // 确认删除
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('确认删除'),
+          content: Text('确定要删除目标文档 $docId 吗？'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('删除'),
+              style: TextButton.styleFrom(
+                foregroundColor: Theme.of(context).colorScheme.error,
+              ),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true) return;
+
+      setState(() {
+        _isProcessing = true;
+        _processingMessage = '正在删除目标文档...';
+      });
+
+      try {
+        if (widget.targetConnectionId != null) {
+          // 将字符串ID转换为ObjectId
+          final objectId = _convertToObjectId(docId);
+          await _mongoService.deleteDocument(
+            widget.targetConnectionId!,
+            widget.targetDatabaseName,
+            widget.targetCollection,
+            objectId,
+          );
+
+          // 更新本地数据
+          setState(() {
+            _targetDocuments.remove(docId);
+          });
+
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('目标文档已删除')));
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('删除目标文档失败: $e')));
+      } finally {
+        setState(() {
+          _isProcessing = false;
+        });
+      }
+    } else {
+      // 字段级别删除
+      final fieldPath = parts.sublist(1).join('.');
+      await _deleteTargetField(docId, fieldPath);
+    }
+  }
+
+  // 删除目标文档字段
+  Future<void> _deleteTargetField(String docId, String fieldPath) async {
+    if (widget.targetConnectionId == null) return;
+
+    // 获取目标文档
+    final targetDoc = _targetDocuments[docId];
+    if (targetDoc == null) return;
+
     // 确认删除
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('确认删除'),
-        content: Text('确定要删除目标文档 $docId 吗？'),
+        content: Text('确定要删除目标文档 $docId 的字段 $fieldPath 吗？'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -1135,37 +1293,98 @@ class _DocumentTreeComparisonScreenState
 
     setState(() {
       _isProcessing = true;
-      _processingMessage = '正在删除目标文档...';
+      _processingMessage = '正在删除目标文档字段...';
     });
 
     try {
-      if (widget.targetConnectionId != null) {
-        // 将字符串ID转换为ObjectId
-        final objectId = _convertToObjectId(docId);
-        await _mongoService.deleteDocument(
-          widget.targetConnectionId!,
-          widget.targetDatabaseName,
-          widget.targetCollection,
-          objectId,
-        );
+      // 将字符串ID转换为ObjectId
+      final objectId = _convertToObjectId(docId);
 
-        // 更新本地数据
-        setState(() {
-          _targetDocuments.remove(docId);
-        });
+      // 使用removeField方法删除字段
+      await _mongoService.removeField(
+        widget.targetConnectionId!,
+        widget.targetDatabaseName,
+        widget.targetCollection,
+        objectId,
+        fieldPath,
+      );
 
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('目标文档已删除')));
-      }
+      // 更新本地数据
+      final updatedTargetDoc = Map<String, dynamic>.from(targetDoc);
+      _removeNestedField(updatedTargetDoc, fieldPath.split('.'));
+      setState(() {
+        _targetDocuments[docId] = updatedTargetDoc;
+      });
+
+      // 更新文档差异状态
+      _updateDocumentDiff(docId);
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('字段 $fieldPath 已从目标文档删除')));
     } catch (e) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('删除目标文档失败: $e')));
+      ).showSnackBar(SnackBar(content: Text('删除目标文档字段失败: $e')));
     } finally {
       setState(() {
         _isProcessing = false;
       });
+    }
+  }
+
+  // 删除嵌套字段
+  void _removeNestedField(Map<String, dynamic> doc, List<String> pathParts) {
+    if (pathParts.isEmpty) return;
+
+    final lastPart = pathParts.last;
+    final parentParts = pathParts.sublist(0, pathParts.length - 1);
+
+    // 如果是顶级字段，直接删除
+    if (parentParts.isEmpty) {
+      doc.remove(lastPart);
+      return;
+    }
+
+    // 获取父对象
+    dynamic parent = doc;
+    for (final part in parentParts) {
+      if (parent is! Map) return;
+
+      if (part.startsWith('[') && part.endsWith(']')) {
+        // 处理数组索引
+        final indexStr = part.substring(1, part.length - 1);
+        final index = int.tryParse(indexStr);
+
+        if (index != null && parent is List && index < parent.length) {
+          parent = parent[index];
+        } else {
+          return;
+        }
+      } else {
+        // 处理对象属性
+        if (!parent.containsKey(part)) {
+          return;
+        }
+        parent = parent[part];
+      }
+    }
+
+    // 删除字段
+    if (lastPart.startsWith('[') && lastPart.endsWith(']')) {
+      // 处理数组索引
+      final indexStr = lastPart.substring(1, lastPart.length - 1);
+      final index = int.tryParse(indexStr);
+
+      if (index != null && parent is List && index < parent.length) {
+        // 对于数组，我们不能真正"删除"索引，但可以设置为null
+        parent[index] = null;
+      }
+    } else {
+      // 处理对象属性
+      if (parent is Map) {
+        parent.remove(lastPart);
+      }
     }
   }
 
