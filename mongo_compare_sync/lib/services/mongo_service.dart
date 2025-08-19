@@ -234,7 +234,9 @@ class MongoService {
       targetDb = await _getDbForDatabase(connectionId, databaseName);
       await targetDb.collection(collectionName).update(
         where.id(id),
-        <String, dynamic>{fieldPath: fieldValue},
+        <String, dynamic>{
+          '\$set': <String, dynamic>{fieldPath: fieldValue},
+        },
       );
       // LogService.instance.info(setField);
     } finally {
