@@ -1006,6 +1006,35 @@ class _DocumentTreeComparisonScreenState
     }
   }
 
+  // 将文档ID转换为ObjectId
+  ObjectId _convertToObjectId(String docId) {
+    try {
+      // 尝试直接解析
+      return ObjectId.parse(docId);
+    } catch (e) {
+      // 如果失败，可能是 ObjectId("xxx") 格式
+      if (docId.startsWith('ObjectId("') && docId.endsWith('")')) {
+        // 提取引号中的内容
+        final hexString = docId.substring(10, docId.length - 2);
+        return ObjectId.parse(hexString);
+      } else if (docId.startsWith('ObjectId(\'') && docId.endsWith('\')')) {
+        // 处理单引号的情况
+        final hexString = docId.substring(10, docId.length - 2);
+        return ObjectId.parse(hexString);
+      } else {
+        // 其他格式，尝试提取任何引号中的内容
+        final regex = RegExp(r'"([^"]*)"');
+        final match = regex.firstMatch(docId);
+        if (match != null && match.groupCount >= 1) {
+          return ObjectId.parse(match.group(1)!);
+        }
+
+        // 如果所有尝试都失败，抛出异常
+        throw FormatException('无法将 $docId 转换为 ObjectId');
+      }
+    }
+  }
+
   // 删除源
   Future<void> _deleteSource() async {
     if (_selectedSourcePath == null) return;
@@ -1045,7 +1074,7 @@ class _DocumentTreeComparisonScreenState
     try {
       if (widget.sourceConnectionId != null) {
         // 将字符串ID转换为ObjectId
-        final objectId = ObjectId.parse(docId);
+        final objectId = _convertToObjectId(docId);
         await _mongoService.deleteDocument(
           widget.sourceConnectionId!,
           widget.sourceDatabaseName,
@@ -1112,7 +1141,7 @@ class _DocumentTreeComparisonScreenState
     try {
       if (widget.targetConnectionId != null) {
         // 将字符串ID转换为ObjectId
-        final objectId = ObjectId.parse(docId);
+        final objectId = _convertToObjectId(docId);
         await _mongoService.deleteDocument(
           widget.targetConnectionId!,
           widget.targetDatabaseName,
@@ -1158,7 +1187,7 @@ class _DocumentTreeComparisonScreenState
       final sourceDoc = _sourceDocuments[docId];
       if (sourceDoc != null) {
         // 文档已存在，使用更新
-        final objectId = ObjectId.parse(docId);
+        final objectId = _convertToObjectId(docId);
         final docToUpdate = Map<String, dynamic>.from(targetDoc);
         docToUpdate.remove('_id'); // 移除_id字段，避免更新错误
         await _mongoService.updateDocument(
@@ -1224,7 +1253,7 @@ class _DocumentTreeComparisonScreenState
       _setNestedValue(updatedSourceDoc, fieldPath.split('.'), fieldValue);
 
       // 保存更新后的源文档
-      final objectId = ObjectId.parse(docId);
+      final objectId = _convertToObjectId(docId);
       final docToUpdate = Map<String, dynamic>.from(updatedSourceDoc);
       docToUpdate.remove('_id'); // 移除_id字段，避免更新错误
       await _mongoService.updateDocument(
@@ -1275,7 +1304,7 @@ class _DocumentTreeComparisonScreenState
       final targetDoc = _targetDocuments[docId];
       if (targetDoc != null) {
         // 文档已存在，使用更新
-        final objectId = ObjectId.parse(docId);
+        final objectId = _convertToObjectId(docId);
         final docToUpdate = Map<String, dynamic>.from(sourceDoc);
         docToUpdate.remove('_id'); // 移除_id字段，避免更新错误
         await _mongoService.updateDocument(
@@ -1341,7 +1370,7 @@ class _DocumentTreeComparisonScreenState
       _setNestedValue(updatedTargetDoc, fieldPath.split('.'), fieldValue);
 
       // 保存更新后的目标文档
-      final objectId = ObjectId.parse(docId);
+      final objectId = _convertToObjectId(docId);
       final docToUpdate = Map<String, dynamic>.from(updatedTargetDoc);
       docToUpdate.remove('_id'); // 移除_id字段，避免更新错误
       await _mongoService.updateDocument(
