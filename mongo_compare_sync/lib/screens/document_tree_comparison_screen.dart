@@ -363,6 +363,18 @@ class _DocumentTreeComparisonScreenState
     final bool canDeleteSource = _selectedSourcePath != null;
     final bool canDeleteTarget = _selectedTargetPath != null;
 
+    // 判断选择的是文档还是属性
+    String? sourceSelectionType;
+    String? targetSelectionType;
+
+    if (_selectedSourcePath != null) {
+      sourceSelectionType = _selectedSourcePath!.contains('.') ? '属性' : '文档';
+    }
+
+    if (_selectedTargetPath != null) {
+      targetSelectionType = _selectedTargetPath!.contains('.') ? '属性' : '文档';
+    }
+
     return Container(
       padding: const EdgeInsets.all(8.0),
       decoration: BoxDecoration(
@@ -388,7 +400,11 @@ class _DocumentTreeComparisonScreenState
                 // 删除源按钮
                 ElevatedButton.icon(
                   icon: const Icon(Icons.delete),
-                  label: const Text('删除'),
+                  label: Text(
+                    sourceSelectionType != null
+                        ? '删除${sourceSelectionType}'
+                        : '删除',
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Theme.of(context).colorScheme.error,
                     foregroundColor: Theme.of(context).colorScheme.onError,
@@ -423,7 +439,11 @@ class _DocumentTreeComparisonScreenState
                 // 删除目标按钮
                 ElevatedButton.icon(
                   icon: const Icon(Icons.delete),
-                  label: const Text('删除'),
+                  label: Text(
+                    targetSelectionType != null
+                        ? '删除${targetSelectionType}'
+                        : '删除',
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Theme.of(context).colorScheme.error,
                     foregroundColor: Theme.of(context).colorScheme.onError,
@@ -434,7 +454,11 @@ class _DocumentTreeComparisonScreenState
                 // 复制到目标按钮
                 ElevatedButton.icon(
                   icon: const Icon(Icons.arrow_forward),
-                  label: const Text('复制到目标'),
+                  label: Text(
+                    sourceSelectionType != null
+                        ? '复制${sourceSelectionType}到目标'
+                        : '复制到目标',
+                  ),
                   onPressed: canCopyToTarget ? _copyToTarget : null,
                 ),
               ],
