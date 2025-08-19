@@ -535,15 +535,37 @@ class _DocumentTreeComparisonScreenState
       );
     }
 
+    // 判断是否被选中
+    final bool isSelected = isSource
+        ? _selectedSourcePath == docId
+        : _selectedTargetPath == docId;
+
     // 构建文档卡片
     return Card(
       margin: const EdgeInsets.all(4.0),
+      color: isSelected ? Theme.of(context).colorScheme.primaryContainer : null,
+      elevation: isSelected ? 4 : 1,
       child: Column(
         children: [
           // 文档标题行
           ListTile(
-            title: Text('文档 ID: $docId'),
-            subtitle: Text(_getDocumentStatusText(diff, isSource)),
+            title: Text(
+              '文档 ID: $docId',
+              style: TextStyle(
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected
+                    ? Theme.of(context).colorScheme.onPrimaryContainer
+                    : null,
+              ),
+            ),
+            subtitle: Text(
+              _getDocumentStatusText(diff, isSource),
+              style: TextStyle(
+                color: isSelected
+                    ? Theme.of(context).colorScheme.onPrimaryContainer
+                    : null,
+              ),
+            ),
             leading: _getDocumentIcon(diff, isSource),
             trailing: IconButton(
               icon: Icon(isExpanded ? Icons.expand_less : Icons.expand_more),
@@ -553,9 +575,7 @@ class _DocumentTreeComparisonScreenState
                 });
               },
             ),
-            selected: isSource
-                ? _selectedSourcePath == docId
-                : _selectedTargetPath == docId,
+            selected: isSelected,
             onTap: () {
               setState(() {
                 if (isSource) {
