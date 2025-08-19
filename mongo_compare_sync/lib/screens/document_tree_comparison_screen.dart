@@ -1248,23 +1248,19 @@ class _DocumentTreeComparisonScreenState
       // 从目标文档中获取字段值
       final fieldValue = _getNestedValue(targetDoc, fieldPath.split('.'));
 
-      // 更新源文档中的字段值
-      final updatedSourceDoc = Map<String, dynamic>.from(sourceDoc);
-      _setNestedValue(updatedSourceDoc, fieldPath.split('.'), fieldValue);
-
-      // 保存更新后的源文档
+      // 使用updateField方法更新单个字段
       final objectId = _convertToObjectId(docId);
-      final docToUpdate = Map<String, dynamic>.from(updatedSourceDoc);
-      docToUpdate.remove('_id'); // 移除_id字段，避免更新错误
-      await _mongoService.updateDocument(
+      await _mongoService.updateField(
         widget.sourceConnectionId!,
         widget.sourceDatabaseName,
         widget.sourceCollection,
         objectId,
-        docToUpdate,
+        SetField(fieldPath, fieldValue),
       );
 
       // 更新本地数据
+      final updatedSourceDoc = Map<String, dynamic>.from(sourceDoc);
+      _setNestedValue(updatedSourceDoc, fieldPath.split('.'), fieldValue);
       setState(() {
         _sourceDocuments[docId] = updatedSourceDoc;
       });
@@ -1365,23 +1361,19 @@ class _DocumentTreeComparisonScreenState
       // 从源文档中获取字段值
       final fieldValue = _getNestedValue(sourceDoc, fieldPath.split('.'));
 
-      // 更新目标文档中的字段值
-      final updatedTargetDoc = Map<String, dynamic>.from(targetDoc);
-      _setNestedValue(updatedTargetDoc, fieldPath.split('.'), fieldValue);
-
-      // 保存更新后的目标文档
+      // 使用updateField方法更新单个字段
       final objectId = _convertToObjectId(docId);
-      final docToUpdate = Map<String, dynamic>.from(updatedTargetDoc);
-      docToUpdate.remove('_id'); // 移除_id字段，避免更新错误
-      await _mongoService.updateDocument(
+      await _mongoService.updateField(
         widget.targetConnectionId!,
         widget.targetDatabaseName,
         widget.targetCollection,
         objectId,
-        docToUpdate,
+        SetField(fieldPath, fieldValue),
       );
 
       // 更新本地数据
+      final updatedTargetDoc = Map<String, dynamic>.from(targetDoc);
+      _setNestedValue(updatedTargetDoc, fieldPath.split('.'), fieldValue);
       setState(() {
         _targetDocuments[docId] = updatedTargetDoc;
       });
