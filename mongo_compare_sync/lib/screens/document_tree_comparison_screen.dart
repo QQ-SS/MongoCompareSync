@@ -904,7 +904,7 @@ class _DocumentTreeComparisonScreenState
   Widget _getDocumentIcon(DocumentDiff diff, bool isSource) {
     return diff.sourceDocument == null || diff.targetDocument == null
         ? Icon(Icons.add_circle, color: isSource ? Colors.green : Colors.grey)
-        : diff.fieldDiffs?.keys.isNotEmpty == true
+        : diff.fieldDiffs?.keys.isEmpty == true
         ? const Icon(Icons.check_circle, color: Colors.green)
         : const Icon(Icons.edit, color: Colors.amber);
   }
@@ -915,7 +915,7 @@ class _DocumentTreeComparisonScreenState
         ? (diff.sourceDocument != null
               ? (isSource ? '仅在源中存在' : '不存在')
               : (!isSource ? '仅在目标中存在' : '不存在'))
-        : diff.fieldDiffs?.keys.isNotEmpty == true
+        : diff.fieldDiffs?.keys.isEmpty == true
         ? '相同'
         : '已修改';
   }
