@@ -1424,11 +1424,9 @@ class _DocumentTreeComparisonScreenState
   Future<void> _copyFieldToSource(String docId, String fieldPath) async {
     if (widget.sourceConnectionId == null) return;
 
-    // 获取源文档和目标文档
-    final sourceDoc = _sourceDocuments[docId];
+    // 获取目标文档
     final targetDoc = _targetDocuments[docId];
-
-    if (sourceDoc == null || targetDoc == null) return;
+    if (targetDoc == null) return;
 
     setState(() {
       _isProcessing = true;
@@ -1439,23 +1437,46 @@ class _DocumentTreeComparisonScreenState
       // 从目标文档中获取字段值
       final fieldValue = _getNestedValue(targetDoc, fieldPath.split('.'));
 
-      // 使用updateField方法更新单个字段
+      // 检查源文档是否存在
+      final sourceDoc = _sourceDocuments[docId];
       final objectId = _convertToObjectId(docId);
-      await _mongoService.updateField(
-        widget.sourceConnectionId!,
-        widget.sourceDatabaseName,
-        widget.sourceCollection,
-        objectId,
-        fieldPath,
-        fieldValue,
-      );
 
-      // 更新本地数据
-      final updatedSourceDoc = Map<String, dynamic>.from(sourceDoc);
-      _setNestedValue(updatedSourceDoc, fieldPath.split('.'), fieldValue);
-      setState(() {
-        _sourceDocuments[docId] = updatedSourceDoc;
-      });
+      if (sourceDoc == null) {
+        // 源文档不存在，需要先创建一个空文档
+        // 创建一个只包含_id和要复制字段的新文档
+        final Map<String, dynamic> newDoc = {'_id': objectId};
+        _setNestedValue(newDoc, fieldPath.split('.'), fieldValue);
+
+        // 插入新文档
+        await _mongoService.insertDocument(
+          widget.sourceConnectionId!,
+          widget.sourceDatabaseName,
+          widget.sourceCollection,
+          newDoc,
+        );
+
+        // 更新本地数据
+        setState(() {
+          _sourceDocuments[docId] = newDoc;
+        });
+      } else {
+        // 源文档存在，使用updateField更新字段
+        await _mongoService.updateField(
+          widget.sourceConnectionId!,
+          widget.sourceDatabaseName,
+          widget.sourceCollection,
+          objectId,
+          fieldPath,
+          fieldValue,
+        );
+
+        // 更新本地数据
+        final updatedSourceDoc = Map<String, dynamic>.from(sourceDoc);
+        _setNestedValue(updatedSourceDoc, fieldPath.split('.'), fieldValue);
+        setState(() {
+          _sourceDocuments[docId] = updatedSourceDoc;
+        });
+      }
 
       // 更新文档差异状态
       _updateDocumentDiff(docId);
@@ -1530,11 +1551,9 @@ class _DocumentTreeComparisonScreenState
   Future<void> _copyFieldToTarget(String docId, String fieldPath) async {
     if (widget.targetConnectionId == null) return;
 
-    // 获取源文档和目标文档
+    // 获取源文档
     final sourceDoc = _sourceDocuments[docId];
-    final targetDoc = _targetDocuments[docId];
-
-    if (sourceDoc == null || targetDoc == null) return;
+    if (sourceDoc == null) return;
 
     setState(() {
       _isProcessing = true;
@@ -1545,27 +1564,51 @@ class _DocumentTreeComparisonScreenState
       // 从源文档中获取字段值
       final fieldValue = _getNestedValue(sourceDoc, fieldPath.split('.'));
 
-      // 使用updateField方法更新单个字段
+      // 检查目标文档是否存在
+      final targetDoc = _targetDocuments[docId];
       final objectId = _convertToObjectId(docId);
-      await _mongoService.updateField(
-        widget.targetConnectionId!,
-        widget.targetDatabaseName,
-        widget.targetCollection,
-        objectId,
-        fieldPath,
-        fieldValue,
-      );
 
-      // 更新本地数据
-      final updatedTargetDoc = Map<String, dynamic>.from(targetDoc);
-      _setNestedValue(updatedTargetDoc, fieldPath.split('.'), fieldValue);
-      setState(() {
-        _targetDocuments[docId] = updatedTargetDoc;
-      });
+      if (targetDoc == null) {
+        // 目标文档不存在，需要先创建一个空文档
+        // 创建一个只包含_id和要复制字段的新文档
+        final Map<String, dynamic> newDoc = {'_id': objectId};
+        _setNestedValue(newDoc, fieldPath.split('.'), fieldValue);
+
+        // 插入新文档
+        await _mongoService.insertDocument(
+          widget.targetConnectionId!,
+          widget.targetDatabaseName,
+          widget.targetCollection,
+          newDoc,
+        );
+
+        // 更新本地数据
+        setState(() {
+          _targetDocuments[docId] = newDoc;
+        });
+      } else {
+        // 目标文档存在，使用updateField更新字段
+        await _mongoService.updateField(
+          widget.targetConnectionId!,
+          widget.targetDatabaseName,
+          widget.targetCollection,
+          objectId,
+          fieldPath,
+          fieldValue,
+        );
+
+        // 更新本地数据
+        final updatedTargetDoc = Map<String, dynamic>.from(targetDoc);
+        _setNestedValue(updatedTargetDoc, fieldPath.split('.'), fieldValue);
+        setState(() {
+          _targetDocuments[docId] = updatedTargetDoc;
+        });
+      }
 
       // 更新文档差异状态
       _updateDocumentDiff(docId);
     } catch (e) {
+      print(e);
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('复制字段到目标失败: $e')));
