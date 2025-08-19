@@ -393,7 +393,11 @@ class _DocumentTreeComparisonScreenState
                 // 复制到源按钮
                 ElevatedButton.icon(
                   icon: const Icon(Icons.arrow_back),
-                  label: const Text('复制到源'),
+                  label: Text(
+                    targetSelectionType != null
+                        ? '复制${targetSelectionType}到源'
+                        : '复制到源',
+                  ),
                   onPressed: canCopyToSource ? _copyToSource : null,
                 ),
                 const SizedBox(width: 8),
