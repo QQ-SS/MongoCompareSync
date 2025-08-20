@@ -982,7 +982,23 @@ class _DocumentTreeComparisonScreenState
   // 检查字段是否有差异
   bool _hasFieldDiff(DocumentDiff diff, String fieldPath) {
     if (diff.fieldDiffs == null) return false;
-    return diff.fieldDiffs!.contains(fieldPath);
+    
+    // 检查完全匹配
+    if (diff.fieldDiffs!.contains(fieldPath)) return true;
+    
+    // 检查前缀匹配（对于嵌套字段）
+    final String prefix = '$fieldPath.';
+    for (final path in diff.fieldDiffs!) {
+      if (path.startsWith(prefix)) return true;
+    }
+    
+    // 检查数组元素匹配
+    final String arrayPrefix = '$fieldPath[';
+    for (final path in diff.fieldDiffs!) {
+      if (path.startsWith(arrayPrefix)) return true;
+    }
+    
+    return false;
   }
 
   // 复制到源
