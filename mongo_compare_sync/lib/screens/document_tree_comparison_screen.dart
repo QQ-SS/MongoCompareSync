@@ -270,159 +270,6 @@ class _DocumentTreeComparisonScreenState
     );
   }
 
-  // 构建文档字段树
-  Widget _buildDocumentFields(
-    Map<String, dynamic> data,
-    DocumentDiff diff,
-    bool isSource, {
-    required String parentPath,
-  }) {
-    final List<Widget> fieldWidgets = [];
-
-    // 对字段进行排序
-    final List<String> sortedKeys = data.keys.toList()..sort();
-
-    for (final key in sortedKeys) {
-      final value = data[key];
-      final String fieldPath = '$parentPath.$key';
-
-      // 检查是否为忽略字段
-      final bool isIgnored = widget.ignoredFields.contains(key);
-
-      // 检查字段是否有差异
-      final bool hasDiff = _hasFieldDiff(diff, key);
-
-      // 字段值的显示文本
-      String valueText;
-      bool isExpandable = false;
-      Map<String, dynamic>? nestedData;
-
-      if (value == null) {
-        valueText = 'null';
-      } else if (value is Map) {
-        valueText = '{...}';
-        isExpandable = true;
-        nestedData = Map<String, dynamic>.from(value);
-      } else if (value is List) {
-        valueText = '[${value.length}]';
-        // 所有数组都可以展开，不仅仅是包含Map的数组
-        isExpandable = true;
-        nestedData = {};
-        for (int i = 0; i < value.length; i++) {
-          nestedData['[$i]'] = value[i];
-        }
-      } else {
-        valueText = value.toString();
-      }
-
-      // 构建字段行
-      final bool isExpanded = _expandedDocuments[fieldPath] ?? false;
-
-      fieldWidgets.add(
-        InkWell(
-          onTap: () {
-            setState(() {
-              if (isSource) {
-                _selectedSourcePath = _selectedSourcePath == fieldPath
-                    ? null
-                    : fieldPath;
-                _selectedTargetPath = null;
-              } else {
-                _selectedTargetPath = _selectedTargetPath == fieldPath
-                    ? null
-                    : fieldPath;
-                _selectedSourcePath = null;
-              }
-            });
-          },
-          child: Container(
-            color: _getFieldBackgroundColor(
-              isSource
-                  ? _selectedSourcePath == fieldPath
-                  : _selectedTargetPath == fieldPath,
-              isIgnored,
-              hasDiff,
-            ),
-            padding: const EdgeInsets.symmetric(vertical: 4.0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (isExpandable)
-                  IconButton(
-                    icon: Icon(
-                      isExpanded ? Icons.arrow_drop_down : Icons.arrow_right,
-                      size: 20,
-                    ),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    onPressed: () {
-                      setState(() {
-                        _expandedDocuments[fieldPath] = !isExpanded;
-                      });
-                    },
-                  )
-                else
-                  const SizedBox(width: 20),
-
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            key,
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: _getFieldTextColor(isIgnored, hasDiff),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            ': $valueText',
-                            style: TextStyle(
-                              color: _getFieldTextColor(isIgnored, hasDiff),
-                            ),
-                          ),
-                          if (hasDiff)
-                            Padding(
-                              padding: const EdgeInsets.only(left: 8.0),
-                              child: Icon(
-                                Icons.compare_arrows,
-                                size: 16,
-                                color: Theme.of(context).colorScheme.error,
-                              ),
-                            ),
-                        ],
-                      ),
-
-                      // 展开的嵌套字段
-                      if (isExpanded && isExpandable && nestedData != null)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 16.0, top: 4.0),
-                          child: _buildNestedFields(
-                            nestedData,
-                            diff,
-                            isSource,
-                            parentPath: fieldPath,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: fieldWidgets,
-    );
-  }
-
   // 构建文档项
   Widget _buildDocumentItem(DocumentDiff diff, bool isSource) {
     final String docId = diff.id;
@@ -515,7 +362,7 @@ class _DocumentTreeComparisonScreenState
                 horizontal: 16.0,
                 vertical: 8.0,
               ),
-              child: _buildDocumentFields(
+              child: _buildNestedFields(
                 docData,
                 diff,
                 isSource,
@@ -601,7 +448,7 @@ class _DocumentTreeComparisonScreenState
         isExpandable = true;
         nestedData = {};
         for (int i = 0; i < value.length; i++) {
-          nestedData['[$i]'] = value[i];
+          nestedData['$i'] = value[i];
         }
       } else {
         valueText = value.toString();
@@ -769,29 +616,33 @@ class _DocumentTreeComparisonScreenState
           if (!fieldDiffs.contains(fieldPath)) {
             fieldDiffs.add(fieldPath);
           }
-        } else {
-          // 数组长度相同，逐个比较元素
-          for (int i = 0; i < sourceValue.length; i++) {
-            final sourceItem = sourceValue[i];
-            final targetItem = targetValue[i];
+        }
+        //else {
+        // 数组长度相同，逐个比较元素
+        final len = sourceValue.length <= targetValue.length
+            ? sourceValue.length
+            : targetValue.length;
+        for (int i = 0; i < len; i++) {
+          final sourceItem = sourceValue[i];
+          final targetItem = targetValue[i];
 
-            if (sourceItem is Map && targetItem is Map) {
-              // 递归比较嵌套对象
-              _compareDocument(
-                Map<String, dynamic>.from(sourceItem),
-                Map<String, dynamic>.from(targetItem),
-                '$fieldPath[$i]',
-                fieldDiffs,
-              );
-            } else if (sourceItem != targetItem) {
-              // 值不同，添加差异字段路径
-              final itemPath = '$fieldPath[$i]';
-              if (!fieldDiffs.contains(itemPath)) {
-                fieldDiffs.add(itemPath);
-              }
+          if (sourceItem is Map && targetItem is Map) {
+            // 递归比较嵌套对象
+            _compareDocument(
+              Map<String, dynamic>.from(sourceItem),
+              Map<String, dynamic>.from(targetItem),
+              '$fieldPath.$i',
+              fieldDiffs,
+            );
+          } else if (sourceItem != targetItem) {
+            // 值不同，添加差异字段路径
+            final itemPath = '$fieldPath.$i';
+            if (!fieldDiffs.contains(itemPath)) {
+              fieldDiffs.add(itemPath);
             }
           }
         }
+        // }
       } else if (sourceValue != targetValue) {
         // 值不同，添加差异字段路径
         if (!fieldDiffs.contains(fieldPath)) {
@@ -827,7 +678,7 @@ class _DocumentTreeComparisonScreenState
         // 比较文档字段
         final fieldDiffs = <String>[];
         if (sourceDoc != null && targetDoc != null) {
-          _compareDocument(sourceDoc, targetDoc, '', fieldDiffs);
+          _compareDocument(sourceDoc, targetDoc, docId, fieldDiffs);
         }
         _diffResults.add(
           DocumentDiff(
@@ -1312,13 +1163,6 @@ class _DocumentTreeComparisonScreenState
     for (final path in diff.fieldDiffs!) {
       if (path.startsWith(prefix)) return true;
     }
-
-    // 检查数组元素匹配
-    final String arrayPrefix = '$fieldPath[';
-    for (final path in diff.fieldDiffs!) {
-      if (path.startsWith(arrayPrefix)) return true;
-    }
-
     return false;
   }
 
@@ -1518,7 +1362,7 @@ class _DocumentTreeComparisonScreenState
 
       // 重新计算字段差异
       final fieldDiffs = <String>[];
-      _compareDocument(sourceDoc, targetDoc, '', fieldDiffs);
+      _compareDocument(sourceDoc, targetDoc, docId, fieldDiffs);
 
       // 更新差异记录
       if (index >= 0) {
