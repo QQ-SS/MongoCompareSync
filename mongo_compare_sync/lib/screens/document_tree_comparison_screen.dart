@@ -625,10 +625,19 @@ class _DocumentTreeComparisonScreenState
         }
         //else {
         // 数组长度相同，逐个比较元素
-        final len = sourceValue.length <= targetValue.length
+        final len = sourceValue.length > targetValue.length
             ? sourceValue.length
             : targetValue.length;
         for (int i = 0; i < len; i++) {
+          // 判断是否下标溢出
+          if (i >= sourceValue.length || i >= targetValue.length) {
+            final itemPath = '$fieldPath.$i';
+            if (!fieldDiffs.contains(itemPath)) {
+              fieldDiffs.add(itemPath);
+            }
+            continue;
+          }
+
           final sourceItem = sourceValue[i];
           final targetItem = targetValue[i];
 
@@ -1335,8 +1344,14 @@ class _DocumentTreeComparisonScreenState
     // 设置字段值
     if (parent is List) {
       final index = int.tryParse(lastPart);
-      if (index != null && index < parent.length) {
-        parent[index] = value;
+      if (index != null) {
+        if (index < parent.length) {
+          parent[index] = value;
+        } else {
+          // 如果索引大于现有长度，则添加新元素
+          parent.addAll(List.filled(index + 1 - parent.length, null));
+          parent[index] = value;
+        }
       }
     } else {
       // 处理对象属性
