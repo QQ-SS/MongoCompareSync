@@ -124,6 +124,7 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                                   connection: _sourceConnection,
                                   type: PanelType.source,
                                   onBindingCheck: _isSourceBound,
+                                  onCollectionsLoaded: _repaintConnectionLines,
                                 ),
                               ),
                               const Spacer(flex: 1),
@@ -260,6 +261,14 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
   // 添加绑定
   void _addBinding(BindingConfig binding) {
     ref.read(compareViewProvider.notifier).addBinding(binding);
+  }
+
+  // 重绘连接线
+  void _repaintConnectionLines() {
+    // 强制重绘，触发 ConnectionLinePainter 的 paint 方法
+    setState(() {
+      // 仅触发重绘，不需要更改状态
+    });
   }
 
   // 更改连接

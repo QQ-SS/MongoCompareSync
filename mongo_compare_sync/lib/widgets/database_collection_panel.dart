@@ -19,6 +19,7 @@ class DatabaseCollectionPanel extends ConsumerStatefulWidget {
   )?
   onDragAccept;
   final Function(String database, String collection) onBindingCheck;
+  final VoidCallback? onCollectionsLoaded; // 添加回调函数，当集合加载完成时通知父组件
 
   const DatabaseCollectionPanel({
     super.key,
@@ -27,6 +28,7 @@ class DatabaseCollectionPanel extends ConsumerStatefulWidget {
     this.onDragStart,
     this.onDragAccept,
     required this.onBindingCheck,
+    this.onCollectionsLoaded, // 添加回调函数参数
   });
 
   @override
@@ -192,6 +194,14 @@ class DatabaseCollectionPanelState
           _databases[database] = collections.map((c) => c.name).toList();
           _loadingCollections.remove(database);
         });
+
+        // 通知父组件集合已加载完成，需要重绘连接线
+        if (widget.onCollectionsLoaded != null) {
+          // 使用 WidgetsBinding 确保在下一帧绘制
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            widget.onCollectionsLoaded!();
+          });
+        }
       }
     } catch (e) {
       LogService.instance.error(
