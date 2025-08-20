@@ -46,8 +46,9 @@ class _DocumentTreeComparisonScreenState
   final Map<String, bool> _expandedDocuments = {};
 
   // 存储选中的节点路径
-  String? _selectedSourcePath;
-  String? _selectedTargetPath;
+  String? _selectedPath;
+  // 表示当前选择的是源还是目标
+  bool _isSourceSelected = true;
   // 滚动控制器
   final ScrollController _sourceScrollController = ScrollController();
   final ScrollController _targetScrollController = ScrollController();
@@ -93,21 +94,16 @@ class _DocumentTreeComparisonScreenState
 
   // 构建操作按钮栏
   Widget _buildActionBar() {
-    final bool canCopyToSource = _selectedTargetPath != null;
-    final bool canCopyToTarget = _selectedSourcePath != null;
-    final bool canDeleteSource = _selectedSourcePath != null;
-    final bool canDeleteTarget = _selectedTargetPath != null;
+    final bool canCopyToSource = _selectedPath != null && !_isSourceSelected;
+    final bool canCopyToTarget = _selectedPath != null && _isSourceSelected;
+    final bool canDeleteSource = _selectedPath != null && _isSourceSelected;
+    final bool canDeleteTarget = _selectedPath != null && !_isSourceSelected;
 
     // 判断选择的是文档还是属性
-    String? sourceSelectionType;
-    String? targetSelectionType;
+    String? selectionType;
 
-    if (_selectedSourcePath != null) {
-      sourceSelectionType = _selectedSourcePath!.contains('.') ? '属性' : '文档';
-    }
-
-    if (_selectedTargetPath != null) {
-      targetSelectionType = _selectedTargetPath!.contains('.') ? '属性' : '文档';
+    if (_selectedPath != null) {
+      selectionType = _selectedPath!.contains('.') ? '属性' : '文档';
     }
 
     return Container(
@@ -129,9 +125,7 @@ class _DocumentTreeComparisonScreenState
                 ElevatedButton.icon(
                   icon: const Icon(Icons.arrow_back),
                   label: Text(
-                    targetSelectionType != null
-                        ? '复制${targetSelectionType}到源'
-                        : '复制到源',
+                    selectionType != null ? '复制${selectionType}到源' : '复制到源',
                   ),
                   onPressed: canCopyToSource ? _copyToSource : null,
                 ),
@@ -140,9 +134,7 @@ class _DocumentTreeComparisonScreenState
                 ElevatedButton.icon(
                   icon: const Icon(Icons.delete),
                   label: Text(
-                    sourceSelectionType != null
-                        ? '删除${sourceSelectionType}'
-                        : '删除',
+                    selectionType != null ? '删除${selectionType}' : '删除',
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Theme.of(context).colorScheme.error,
@@ -179,9 +171,7 @@ class _DocumentTreeComparisonScreenState
                 ElevatedButton.icon(
                   icon: const Icon(Icons.delete),
                   label: Text(
-                    targetSelectionType != null
-                        ? '删除${targetSelectionType}'
-                        : '删除',
+                    selectionType != null ? '删除${selectionType}' : '删除',
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Theme.of(context).colorScheme.error,
@@ -194,9 +184,7 @@ class _DocumentTreeComparisonScreenState
                 ElevatedButton.icon(
                   icon: const Icon(Icons.arrow_forward),
                   label: Text(
-                    sourceSelectionType != null
-                        ? '复制${sourceSelectionType}到目标'
-                        : '复制到目标',
+                    selectionType != null ? '复制${selectionType}到目标' : '复制到目标',
                   ),
                   onPressed: canCopyToTarget ? _copyToTarget : null,
                 ),
@@ -301,9 +289,7 @@ class _DocumentTreeComparisonScreenState
     }
 
     // 判断是否被选中
-    final bool isSelected = isSource
-        ? _selectedSourcePath == docId
-        : _selectedTargetPath == docId;
+    final bool isSelected = _selectedPath == docId;
 
     // 构建文档卡片
     return Card(
@@ -315,9 +301,11 @@ class _DocumentTreeComparisonScreenState
           // 文档标题行
           ListTile(
             title: Text(
-              '文档 ID: $docId',
+              '文档: $docId',
               style: TextStyle(
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontWeight: isSelected && _isSourceSelected == isSource
+                    ? FontWeight.bold
+                    : FontWeight.normal,
                 color: isSelected
                     ? Theme.of(context).colorScheme.onPrimaryContainer
                     : null,
@@ -343,16 +331,13 @@ class _DocumentTreeComparisonScreenState
             selected: isSelected,
             onTap: () {
               setState(() {
-                if (isSource) {
-                  _selectedSourcePath = _selectedSourcePath == docId
-                      ? null
-                      : docId;
-                  _selectedTargetPath = null;
+                if (_selectedPath == docId && _isSourceSelected == isSource) {
+                  // 如果点击的是已选中的项，则取消选择
+                  _selectedPath = null;
                 } else {
-                  _selectedTargetPath = _selectedTargetPath == docId
-                      ? null
-                      : docId;
-                  _selectedSourcePath = null;
+                  // 否则选中当前项
+                  _selectedPath = docId;
+                  _isSourceSelected = isSource;
                 }
               });
 
@@ -428,7 +413,9 @@ class _DocumentTreeComparisonScreenState
     final List<Widget> fieldWidgets = [];
 
     // 对字段进行排序
-    final List<String> sortedKeys = data.keys.toList()..sort();
+    final List<String> sortedKeys = data.keys.toList()
+      ..sort()
+      ..remove("_id");
 
     for (final key in sortedKeys) {
       final value = data[key];
@@ -439,6 +426,13 @@ class _DocumentTreeComparisonScreenState
 
       // 检查字段是否有差异
       final bool hasDiff = _hasFieldDiff(diff, fieldPath);
+
+      // 构建字段行
+      final bool isExpanded = _expandedDocuments[fieldPath] ?? false;
+
+      // 判断是否被选中
+      final bool isSelected =
+          _selectedPath != null && fieldPath.startsWith(_selectedPath!);
 
       // 字段值的显示文本
       String valueText;
@@ -463,23 +457,17 @@ class _DocumentTreeComparisonScreenState
         valueText = value.toString();
       }
 
-      // 构建字段行
-      final bool isExpanded = _expandedDocuments[fieldPath] ?? false;
-
       fieldWidgets.add(
         InkWell(
           onTap: () {
             setState(() {
-              if (isSource) {
-                _selectedSourcePath = _selectedSourcePath == fieldPath
-                    ? null
-                    : fieldPath;
-                _selectedTargetPath = null;
+              if (_selectedPath == fieldPath && _isSourceSelected == isSource) {
+                // 如果点击的是已选中的项，则取消选择
+                _selectedPath = null;
               } else {
-                _selectedTargetPath = _selectedTargetPath == fieldPath
-                    ? null
-                    : fieldPath;
-                _selectedSourcePath = null;
+                // 否则选中当前项
+                _selectedPath = fieldPath;
+                _isSourceSelected = isSource;
               }
             });
 
@@ -489,9 +477,7 @@ class _DocumentTreeComparisonScreenState
           },
           child: Container(
             color: _getFieldBackgroundColor(
-              isSource
-                  ? _selectedSourcePath == fieldPath
-                  : _selectedTargetPath == fieldPath,
+              _selectedPath == fieldPath,
               isIgnored,
               hasDiff,
             ),
@@ -525,7 +511,10 @@ class _DocumentTreeComparisonScreenState
                           Text(
                             key,
                             style: TextStyle(
-                              fontWeight: FontWeight.bold,
+                              fontWeight:
+                                  isSelected && _isSourceSelected == isSource
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
                               color: _getFieldTextColor(isIgnored, hasDiff),
                             ),
                           ),
@@ -533,6 +522,10 @@ class _DocumentTreeComparisonScreenState
                           Text(
                             ': $valueText',
                             style: TextStyle(
+                              fontWeight:
+                                  isSelected && _isSourceSelected == isSource
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
                               color: _getFieldTextColor(isIgnored, hasDiff),
                             ),
                           ),
@@ -884,10 +877,12 @@ class _DocumentTreeComparisonScreenState
 
   // 复制到源或目标
   Future<void> _copyToDirection(bool toSource) async {
-    final selectedPath = toSource ? _selectedTargetPath : _selectedSourcePath;
-    if (selectedPath == null) return;
+    if (_selectedPath == null) return;
 
-    final parts = selectedPath.split('.');
+    // 确保选择的是正确的方向
+    if (toSource == _isSourceSelected) return;
+
+    final parts = _selectedPath!.split('.');
     final docId = parts.first;
 
     // 检查是否为文档级别操作
@@ -1057,10 +1052,12 @@ class _DocumentTreeComparisonScreenState
 
   // 删除源或目标
   Future<void> _deleteFromDirection(bool isSource) async {
-    final selectedPath = isSource ? _selectedSourcePath : _selectedTargetPath;
-    if (selectedPath == null) return;
+    if (_selectedPath == null) return;
 
-    final parts = selectedPath.split('.');
+    // 确保选择的是正确的方向
+    if (isSource != _isSourceSelected) return;
+
+    final parts = _selectedPath!.split('.');
     final docId = parts.first;
 
     // 检查是否为文档级别操作
@@ -1352,22 +1349,22 @@ class _DocumentTreeComparisonScreenState
     // 查找文档在列表中的索引
     final index = _diffResults.indexWhere((diff) => diff.id == docId);
     if (index < 0) return;
-    
+
     // 使用WidgetsBinding.instance.addPostFrameCallback确保在布局完成后获取正确的滚动位置
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // 获取当前滚动位置
-      final currentScrollOffset = isSource 
-          ? _sourceScrollController.offset 
+      final currentScrollOffset = isSource
+          ? _sourceScrollController.offset
           : _targetScrollController.offset;
-      
+
       // 计算目标滚动控制器
-      final targetController = isSource 
-          ? _targetScrollController 
+      final targetController = isSource
+          ? _targetScrollController
           : _sourceScrollController;
-      
+
       // 滚动到相同的位置，确保两边对齐
       targetController.jumpTo(currentScrollOffset);
-      
+
       // 如果需要滚动到特定文档，可以使用以下方法
       // 但这需要知道每个文档项的确切高度，这里我们直接使用相同的滚动偏移量
       /*
