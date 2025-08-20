@@ -1128,19 +1128,15 @@ class _DocumentTreeComparisonScreenState
     dynamic current = doc;
 
     for (final part in pathParts) {
-      if (current is! Map) return null;
-
-      if (part.startsWith('[') && part.endsWith(']')) {
-        // 处理数组索引
-        final indexStr = part.substring(1, part.length - 1);
-        final index = int.tryParse(indexStr);
-
-        if (index != null && current is List && index < current.length) {
+      if (current is List) {
+        final index = int.tryParse(part);
+        if (index != null && index < current.length) {
           current = current[index];
         } else {
           return null;
         }
       } else {
+        if (current is! Map) return null;
         // 处理对象属性
         current = current[part];
       }
@@ -1260,19 +1256,17 @@ class _DocumentTreeComparisonScreenState
     // 获取父对象
     dynamic parent = doc;
     for (final part in parentParts) {
-      if (parent is! Map) return;
-
-      if (part.startsWith('[') && part.endsWith(']')) {
+      if (parent is List) {
         // 处理数组索引
-        final indexStr = part.substring(1, part.length - 1);
-        final index = int.tryParse(indexStr);
+        final index = int.tryParse(part);
 
-        if (index != null && parent is List && index < parent.length) {
+        if (index != null && index < parent.length) {
           parent = parent[index];
         } else {
           return;
         }
       } else {
+        if (parent is! Map) return;
         // 处理对象属性
         if (!parent.containsKey(part)) {
           return;
@@ -1282,12 +1276,9 @@ class _DocumentTreeComparisonScreenState
     }
 
     // 删除字段
-    if (lastPart.startsWith('[') && lastPart.endsWith(']')) {
-      // 处理数组索引
-      final indexStr = lastPart.substring(1, lastPart.length - 1);
-      final index = int.tryParse(indexStr);
-
-      if (index != null && parent is List && index < parent.length) {
+    if (parent is List) {
+      final index = int.tryParse(lastPart);
+      if (index != null && index < parent.length) {
         // 对于数组，我们不能真正"删除"索引，但可以设置为null
         parent[index] = null;
       }
@@ -1313,19 +1304,16 @@ class _DocumentTreeComparisonScreenState
     // 获取父对象
     dynamic parent = doc;
     for (final part in parentParts) {
-      if (parent is! Map) return;
-
-      if (part.startsWith('[') && part.endsWith(']')) {
+      if (parent is List) {
         // 处理数组索引
-        final indexStr = part.substring(1, part.length - 1);
-        final index = int.tryParse(indexStr);
-
-        if (index != null && parent is List && index < parent.length) {
+        final index = int.tryParse(part);
+        if (index != null && index < parent.length) {
           parent = parent[index];
         } else {
           return;
         }
       } else {
+        if (parent is! Map) return;
         // 处理对象属性
         if (!parent.containsKey(part)) {
           parent[part] = {};
@@ -1335,12 +1323,9 @@ class _DocumentTreeComparisonScreenState
     }
 
     // 设置字段值
-    if (lastPart.startsWith('[') && lastPart.endsWith(']')) {
-      // 处理数组索引
-      final indexStr = lastPart.substring(1, lastPart.length - 1);
-      final index = int.tryParse(indexStr);
-
-      if (index != null && parent is List && index < parent.length) {
+    if (parent is List) {
+      final index = int.tryParse(lastPart);
+      if (index != null && index < parent.length) {
         parent[index] = value;
       }
     } else {
