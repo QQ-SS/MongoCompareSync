@@ -982,57 +982,51 @@ class _DocumentTreeComparisonScreenState
   // 检查字段是否有差异
   bool _hasFieldDiff(DocumentDiff diff, String fieldPath) {
     if (diff.fieldDiffs == null) return false;
-    
+
     // 检查完全匹配
     if (diff.fieldDiffs!.contains(fieldPath)) return true;
-    
+
     // 检查前缀匹配（对于嵌套字段）
     final String prefix = '$fieldPath.';
     for (final path in diff.fieldDiffs!) {
       if (path.startsWith(prefix)) return true;
     }
-    
+
     // 检查数组元素匹配
     final String arrayPrefix = '$fieldPath[';
     for (final path in diff.fieldDiffs!) {
       if (path.startsWith(arrayPrefix)) return true;
     }
-    
+
     return false;
+  }
+
+  // 复制到源或目标
+  Future<void> _copyToDirection(bool toSource) async {
+    final selectedPath = toSource ? _selectedTargetPath : _selectedSourcePath;
+    if (selectedPath == null) return;
+
+    final parts = selectedPath.split('.');
+    final docId = parts.first;
+
+    // 检查是否为文档级别操作
+    if (parts.length == 1) {
+      await _copyDocument(docId, toSource);
+    } else {
+      // 字段级别操作
+      final fieldPath = parts.sublist(1).join('.');
+      await _copyField(docId, fieldPath, toSource);
+    }
   }
 
   // 复制到源
   Future<void> _copyToSource() async {
-    if (_selectedTargetPath == null) return;
-
-    final parts = _selectedTargetPath!.split('.');
-    final docId = parts.first;
-
-    // 检查是否为文档级别操作
-    if (parts.length == 1) {
-      await _copyDocumentToSource(docId);
-    } else {
-      // 字段级别操作
-      final fieldPath = parts.sublist(1).join('.');
-      await _copyFieldToSource(docId, fieldPath);
-    }
+    await _copyToDirection(true);
   }
 
   // 复制到目标
   Future<void> _copyToTarget() async {
-    if (_selectedSourcePath == null) return;
-
-    final parts = _selectedSourcePath!.split('.');
-    final docId = parts.first;
-
-    // 检查是否为文档级别操作
-    if (parts.length == 1) {
-      await _copyDocumentToTarget(docId);
-    } else {
-      // 字段级别操作
-      final fieldPath = parts.sublist(1).join('.');
-      await _copyFieldToTarget(docId, fieldPath);
-    }
+    await _copyToDirection(false);
   }
 
   // 将文档ID转换为ObjectId
@@ -1064,91 +1058,47 @@ class _DocumentTreeComparisonScreenState
     }
   }
 
-  // 删除源
-  Future<void> _deleteSource() async {
-    if (_selectedSourcePath == null) return;
+  // 删除源或目标
+  Future<void> _deleteFromDirection(bool isSource) async {
+    final selectedPath = isSource ? _selectedSourcePath : _selectedTargetPath;
+    if (selectedPath == null) return;
 
-    final parts = _selectedSourcePath!.split('.');
+    final parts = selectedPath.split('.');
     final docId = parts.first;
 
     // 检查是否为文档级别操作
     if (parts.length == 1) {
-      // 文档级别删除
-      // 确认删除
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('确认删除'),
-          content: Text('确定要删除源文档 $docId 吗？'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('取消'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('删除'),
-              style: TextButton.styleFrom(
-                foregroundColor: Theme.of(context).colorScheme.error,
-              ),
-            ),
-          ],
-        ),
-      );
-
-      if (confirmed != true) return;
-
-      setState(() {
-        _isProcessing = true;
-        _processingMessage = '正在删除源文档...';
-      });
-
-      try {
-        if (widget.sourceConnectionId != null) {
-          // 将字符串ID转换为ObjectId
-          final objectId = _convertToObjectId(docId);
-          await _mongoService.deleteDocument(
-            widget.sourceConnectionId!,
-            widget.sourceDatabaseName,
-            widget.sourceCollection,
-            objectId,
-          );
-
-          // 更新本地数据
-          setState(() {
-            _sourceDocuments.remove(docId);
-          });
-        }
-      } catch (e) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('删除源文档失败: $e')));
-      } finally {
-        setState(() {
-          _isProcessing = false;
-        });
-      }
+      await _deleteDocument(docId, isSource);
     } else {
       // 字段级别删除
       final fieldPath = parts.sublist(1).join('.');
-      await _deleteSourceField(docId, fieldPath);
+      await _deleteField(docId, fieldPath, isSource);
     }
   }
 
-  // 删除源文档字段
-  Future<void> _deleteSourceField(String docId, String fieldPath) async {
-    if (widget.sourceConnectionId == null) return;
+  // 删除源
+  Future<void> _deleteSource() async {
+    await _deleteFromDirection(true);
+  }
 
-    // 获取源文档
-    final sourceDoc = _sourceDocuments[docId];
-    if (sourceDoc == null) return;
+  // 删除目标
+  Future<void> _deleteTarget() async {
+    await _deleteFromDirection(false);
+  }
+
+  // 删除文档（统一处理源和目标）
+  Future<void> _deleteDocument(String docId, bool isSource) async {
+    final String? connectionId = isSource
+        ? widget.sourceConnectionId
+        : widget.targetConnectionId;
+    if (connectionId == null) return;
 
     // 确认删除
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('确认删除'),
-        content: Text('确定要删除源文档 $docId 的字段 $fieldPath 吗？'),
+        content: Text('确定要删除${isSource ? '源' : '目标'}文档 $docId 吗？'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -1169,35 +1119,31 @@ class _DocumentTreeComparisonScreenState
 
     setState(() {
       _isProcessing = true;
-      _processingMessage = '正在删除源文档字段...';
+      _processingMessage = '正在删除${isSource ? '源' : '目标'}文档...';
     });
 
     try {
       // 将字符串ID转换为ObjectId
       final objectId = _convertToObjectId(docId);
-
-      // 使用removeField方法删除字段
-      await _mongoService.removeField(
-        widget.sourceConnectionId!,
-        widget.sourceDatabaseName,
-        widget.sourceCollection,
+      await _mongoService.deleteDocument(
+        connectionId,
+        isSource ? widget.sourceDatabaseName : widget.targetDatabaseName,
+        isSource ? widget.sourceCollection : widget.targetCollection,
         objectId,
-        fieldPath,
       );
 
       // 更新本地数据
-      final updatedSourceDoc = Map<String, dynamic>.from(sourceDoc);
-      _removeNestedField(updatedSourceDoc, fieldPath.split('.'));
       setState(() {
-        _sourceDocuments[docId] = updatedSourceDoc;
+        if (isSource) {
+          _sourceDocuments.remove(docId);
+        } else {
+          _targetDocuments.remove(docId);
+        }
       });
-
-      // 更新文档差异状态
-      _updateDocumentDiff(docId);
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('删除源文档字段失败: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('删除${isSource ? '源' : '目标'}文档失败: $e')),
+      );
     } finally {
       setState(() {
         _isProcessing = false;
@@ -1205,91 +1151,30 @@ class _DocumentTreeComparisonScreenState
     }
   }
 
-  // 删除目标
-  Future<void> _deleteTarget() async {
-    if (_selectedTargetPath == null) return;
+  // 删除字段（统一处理源和目标）
+  Future<void> _deleteField(
+    String docId,
+    String fieldPath,
+    bool isSource,
+  ) async {
+    final String? connectionId = isSource
+        ? widget.sourceConnectionId
+        : widget.targetConnectionId;
+    if (connectionId == null) return;
 
-    final parts = _selectedTargetPath!.split('.');
-    final docId = parts.first;
-
-    // 检查是否为文档级别操作
-    if (parts.length == 1) {
-      // 文档级别删除
-      // 确认删除
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('确认删除'),
-          content: Text('确定要删除目标文档 $docId 吗？'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('取消'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('删除'),
-              style: TextButton.styleFrom(
-                foregroundColor: Theme.of(context).colorScheme.error,
-              ),
-            ),
-          ],
-        ),
-      );
-
-      if (confirmed != true) return;
-
-      setState(() {
-        _isProcessing = true;
-        _processingMessage = '正在删除目标文档...';
-      });
-
-      try {
-        if (widget.targetConnectionId != null) {
-          // 将字符串ID转换为ObjectId
-          final objectId = _convertToObjectId(docId);
-          await _mongoService.deleteDocument(
-            widget.targetConnectionId!,
-            widget.targetDatabaseName,
-            widget.targetCollection,
-            objectId,
-          );
-
-          // 更新本地数据
-          setState(() {
-            _targetDocuments.remove(docId);
-          });
-        }
-      } catch (e) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('删除目标文档失败: $e')));
-      } finally {
-        setState(() {
-          _isProcessing = false;
-        });
-      }
-    } else {
-      // 字段级别删除
-      final fieldPath = parts.sublist(1).join('.');
-      await _deleteTargetField(docId, fieldPath);
-    }
-  }
-
-  // 删除目标文档字段
-  Future<void> _deleteTargetField(String docId, String fieldPath) async {
-    if (widget.targetConnectionId == null) return;
-
-    // 获取目标文档
-    final targetDoc = _targetDocuments[docId];
-    if (targetDoc == null) return;
+    // 获取文档
+    final docMap = isSource ? _sourceDocuments : _targetDocuments;
+    final doc = docMap[docId];
+    if (doc == null) return;
 
     // 确认删除
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('确认删除'),
-        content: Text('确定要删除目标文档 $docId 的字段 $fieldPath 吗？'),
+        content: Text(
+          '确定要删除${isSource ? '源' : '目标'}文档 $docId 的字段 $fieldPath 吗？',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -1310,7 +1195,7 @@ class _DocumentTreeComparisonScreenState
 
     setState(() {
       _isProcessing = true;
-      _processingMessage = '正在删除目标文档字段...';
+      _processingMessage = '正在删除${isSource ? '源' : '目标'}文档字段...';
     });
 
     try {
@@ -1319,26 +1204,26 @@ class _DocumentTreeComparisonScreenState
 
       // 使用removeField方法删除字段
       await _mongoService.removeField(
-        widget.targetConnectionId!,
-        widget.targetDatabaseName,
-        widget.targetCollection,
+        connectionId,
+        isSource ? widget.sourceDatabaseName : widget.targetDatabaseName,
+        isSource ? widget.sourceCollection : widget.targetCollection,
         objectId,
         fieldPath,
       );
 
       // 更新本地数据
-      final updatedTargetDoc = Map<String, dynamic>.from(targetDoc);
-      _removeNestedField(updatedTargetDoc, fieldPath.split('.'));
+      final updatedDoc = Map<String, dynamic>.from(doc);
+      _removeNestedField(updatedDoc, fieldPath.split('.'));
       setState(() {
-        _targetDocuments[docId] = updatedTargetDoc;
+        docMap[docId] = updatedDoc;
       });
 
       // 更新文档差异状态
       _updateDocumentDiff(docId);
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('删除目标文档字段失败: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('删除${isSource ? '源' : '目标'}文档字段失败: $e')),
+      );
     } finally {
       setState(() {
         _isProcessing = false;
@@ -1401,182 +1286,62 @@ class _DocumentTreeComparisonScreenState
     }
   }
 
-  // 复制文档到源
-  Future<void> _copyDocumentToSource(String docId) async {
-    if (widget.sourceConnectionId == null) return;
+  // 复制文档（统一处理源和目标）
+  Future<void> _copyDocument(String docId, bool toSource) async {
+    final String? connectionId = toSource
+        ? widget.sourceConnectionId
+        : widget.targetConnectionId;
+    if (connectionId == null) return;
 
-    // 获取目标文档
-    final targetDoc = _targetDocuments[docId];
-    if (targetDoc == null) return;
+    // 获取源文档和目标文档
+    final sourceDoc = toSource
+        ? _targetDocuments[docId]
+        : _sourceDocuments[docId];
+    final targetMap = toSource ? _sourceDocuments : _targetDocuments;
 
-    setState(() {
-      _isProcessing = true;
-      _processingMessage = '正在复制文档到源...';
-    });
-
-    try {
-      // 检查源文档是否已存在
-      final sourceDoc = _sourceDocuments[docId];
-      if (sourceDoc != null) {
-        // 文档已存在，使用更新
-        final objectId = _convertToObjectId(docId);
-        final docToUpdate = Map<String, dynamic>.from(targetDoc);
-        docToUpdate.remove('_id'); // 移除_id字段，避免更新错误
-        await _mongoService.updateDocument(
-          widget.sourceConnectionId!,
-          widget.sourceDatabaseName,
-          widget.sourceCollection,
-          objectId,
-          docToUpdate,
-        );
-      } else {
-        // 文档不存在，使用插入
-        await _mongoService.insertDocument(
-          widget.sourceConnectionId!,
-          widget.sourceDatabaseName,
-          widget.sourceCollection,
-          targetDoc,
-        );
-      }
-
-      // 更新本地数据
-      setState(() {
-        _sourceDocuments[docId] = Map<String, dynamic>.from(targetDoc);
-      });
-
-      // 更新文档差异状态
-      _updateDocumentDiff(docId);
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('复制文档到源失败: $e')));
-    } finally {
-      setState(() {
-        _isProcessing = false;
-      });
-    }
-  }
-
-  // 复制字段到源
-  Future<void> _copyFieldToSource(String docId, String fieldPath) async {
-    if (widget.sourceConnectionId == null) return;
-
-    // 获取目标文档
-    final targetDoc = _targetDocuments[docId];
-    if (targetDoc == null) return;
-
-    setState(() {
-      _isProcessing = true;
-      _processingMessage = '正在复制字段到源...';
-    });
-
-    try {
-      // 从目标文档中获取字段值
-      final fieldValue = _getNestedValue(targetDoc, fieldPath.split('.'));
-
-      // 检查源文档是否存在
-      final sourceDoc = _sourceDocuments[docId];
-      final objectId = _convertToObjectId(docId);
-
-      if (sourceDoc == null) {
-        // 源文档不存在，需要先创建一个空文档
-        // 创建一个只包含_id和要复制字段的新文档
-        final Map<String, dynamic> newDoc = {'_id': objectId};
-        _setNestedValue(newDoc, fieldPath.split('.'), fieldValue);
-
-        // 插入新文档
-        await _mongoService.insertDocument(
-          widget.sourceConnectionId!,
-          widget.sourceDatabaseName,
-          widget.sourceCollection,
-          newDoc,
-        );
-
-        // 更新本地数据
-        setState(() {
-          _sourceDocuments[docId] = newDoc;
-        });
-      } else {
-        // 源文档存在，使用updateField更新字段
-        await _mongoService.updateField(
-          widget.sourceConnectionId!,
-          widget.sourceDatabaseName,
-          widget.sourceCollection,
-          objectId,
-          fieldPath,
-          fieldValue,
-        );
-
-        // 更新本地数据
-        final updatedSourceDoc = Map<String, dynamic>.from(sourceDoc);
-        _setNestedValue(updatedSourceDoc, fieldPath.split('.'), fieldValue);
-        setState(() {
-          _sourceDocuments[docId] = updatedSourceDoc;
-        });
-      }
-
-      // 更新文档差异状态
-      _updateDocumentDiff(docId);
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('复制字段到源失败: $e')));
-    } finally {
-      setState(() {
-        _isProcessing = false;
-      });
-    }
-  }
-
-  // 复制文档到目标
-  Future<void> _copyDocumentToTarget(String docId) async {
-    if (widget.targetConnectionId == null) return;
-
-    // 获取源文档
-    final sourceDoc = _sourceDocuments[docId];
     if (sourceDoc == null) return;
 
     setState(() {
       _isProcessing = true;
-      _processingMessage = '正在复制文档到目标...';
+      _processingMessage = '正在复制文档${toSource ? '到源' : '到目标'}...';
     });
 
     try {
       // 检查目标文档是否已存在
-      final targetDoc = _targetDocuments[docId];
+      final targetDoc = targetMap[docId];
       if (targetDoc != null) {
         // 文档已存在，使用更新
         final objectId = _convertToObjectId(docId);
         final docToUpdate = Map<String, dynamic>.from(sourceDoc);
         docToUpdate.remove('_id'); // 移除_id字段，避免更新错误
         await _mongoService.updateDocument(
-          widget.targetConnectionId!,
-          widget.targetDatabaseName,
-          widget.targetCollection,
+          connectionId,
+          toSource ? widget.sourceDatabaseName : widget.targetDatabaseName,
+          toSource ? widget.sourceCollection : widget.targetCollection,
           objectId,
           docToUpdate,
         );
       } else {
         // 文档不存在，使用插入
         await _mongoService.insertDocument(
-          widget.targetConnectionId!,
-          widget.targetDatabaseName,
-          widget.targetCollection,
+          connectionId,
+          toSource ? widget.sourceDatabaseName : widget.targetDatabaseName,
+          toSource ? widget.sourceCollection : widget.targetCollection,
           sourceDoc,
         );
       }
 
       // 更新本地数据
       setState(() {
-        _targetDocuments[docId] = Map<String, dynamic>.from(sourceDoc);
+        targetMap[docId] = Map<String, dynamic>.from(sourceDoc);
       });
 
       // 更新文档差异状态
       _updateDocumentDiff(docId);
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('复制文档到目标失败: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('复制文档${toSource ? '到源' : '到目标'}失败: $e')),
+      );
     } finally {
       setState(() {
         _isProcessing = false;
@@ -1584,17 +1349,23 @@ class _DocumentTreeComparisonScreenState
     }
   }
 
-  // 复制字段到目标
-  Future<void> _copyFieldToTarget(String docId, String fieldPath) async {
-    if (widget.targetConnectionId == null) return;
+  // 复制字段（统一处理源和目标）
+  Future<void> _copyField(String docId, String fieldPath, bool toSource) async {
+    final String? connectionId = toSource
+        ? widget.sourceConnectionId
+        : widget.targetConnectionId;
+    if (connectionId == null) return;
 
-    // 获取源文档
-    final sourceDoc = _sourceDocuments[docId];
+    // 获取源文档和目标文档
+    final sourceDocMap = toSource ? _targetDocuments : _sourceDocuments;
+    final targetDocMap = toSource ? _sourceDocuments : _targetDocuments;
+
+    final sourceDoc = sourceDocMap[docId];
     if (sourceDoc == null) return;
 
     setState(() {
       _isProcessing = true;
-      _processingMessage = '正在复制字段到目标...';
+      _processingMessage = '正在复制字段${toSource ? '到源' : '到目标'}...';
     });
 
     try {
@@ -1602,7 +1373,7 @@ class _DocumentTreeComparisonScreenState
       final fieldValue = _getNestedValue(sourceDoc, fieldPath.split('.'));
 
       // 检查目标文档是否存在
-      final targetDoc = _targetDocuments[docId];
+      final targetDoc = targetDocMap[docId];
       final objectId = _convertToObjectId(docId);
 
       if (targetDoc == null) {
@@ -1613,22 +1384,22 @@ class _DocumentTreeComparisonScreenState
 
         // 插入新文档
         await _mongoService.insertDocument(
-          widget.targetConnectionId!,
-          widget.targetDatabaseName,
-          widget.targetCollection,
+          connectionId,
+          toSource ? widget.sourceDatabaseName : widget.targetDatabaseName,
+          toSource ? widget.sourceCollection : widget.targetCollection,
           newDoc,
         );
 
         // 更新本地数据
         setState(() {
-          _targetDocuments[docId] = newDoc;
+          targetDocMap[docId] = newDoc;
         });
       } else {
         // 目标文档存在，使用updateField更新字段
         await _mongoService.updateField(
-          widget.targetConnectionId!,
-          widget.targetDatabaseName,
-          widget.targetCollection,
+          connectionId,
+          toSource ? widget.sourceDatabaseName : widget.targetDatabaseName,
+          toSource ? widget.sourceCollection : widget.targetCollection,
           objectId,
           fieldPath,
           fieldValue,
@@ -1638,17 +1409,16 @@ class _DocumentTreeComparisonScreenState
         final updatedTargetDoc = Map<String, dynamic>.from(targetDoc);
         _setNestedValue(updatedTargetDoc, fieldPath.split('.'), fieldValue);
         setState(() {
-          _targetDocuments[docId] = updatedTargetDoc;
+          targetDocMap[docId] = updatedTargetDoc;
         });
       }
 
       // 更新文档差异状态
       _updateDocumentDiff(docId);
     } catch (e) {
-      print(e);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('复制字段到目标失败: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('复制字段${toSource ? '到源' : '到目标'}失败: $e')),
+      );
     } finally {
       setState(() {
         _isProcessing = false;
