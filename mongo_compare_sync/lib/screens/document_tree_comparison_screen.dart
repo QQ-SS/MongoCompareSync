@@ -6,7 +6,6 @@ import '../services/mongo_service.dart';
 import '../providers/connection_provider.dart';
 
 class DocumentTreeComparisonScreen extends ConsumerStatefulWidget {
-  final List<DocumentDiff> results;
   final String sourceCollection;
   final String targetCollection;
   final String sourceDatabaseName;
@@ -18,7 +17,6 @@ class DocumentTreeComparisonScreen extends ConsumerStatefulWidget {
 
   const DocumentTreeComparisonScreen({
     super.key,
-    required this.results,
     required this.sourceCollection,
     required this.targetCollection,
     required this.sourceDatabaseName,
@@ -36,6 +34,7 @@ class DocumentTreeComparisonScreen extends ConsumerStatefulWidget {
 
 class _DocumentTreeComparisonScreenState
     extends ConsumerState<DocumentTreeComparisonScreen> {
+  final List<DocumentDiff> _diffResults = [];
   // 存储展开状态
   final Map<String, bool> _expandedDocuments = {};
 
@@ -162,7 +161,7 @@ class _DocumentTreeComparisonScreenState
     });
 
     try {
-      widget.results.clear();
+      _diffResults.clear();
       // 取源、目标文档的所有id并集，然后进行比较
       final ids = {..._sourceDocuments.keys, ..._targetDocuments.keys}.toList();
       // 更新差异状态
@@ -176,7 +175,7 @@ class _DocumentTreeComparisonScreenState
         if (sourceDoc != null && targetDoc != null) {
           _compareDocument(sourceDoc, targetDoc, '', fieldDiffs);
         }
-        widget.results.add(
+        _diffResults.add(
           DocumentDiff(
             id: docId,
             sourceDocument: sourceDoc,
@@ -208,7 +207,7 @@ class _DocumentTreeComparisonScreenState
 
     for (final field in allFields) {
       // 跳过忽略的字段
-      if (field == "_id" && widget.idField != "_id") continue;
+      if (field == "_id" && widget.idField == "_id") continue;
       if (widget.ignoredFields.contains(field)) continue;
 
       final String fieldPath = parentPath.isEmpty
@@ -269,7 +268,7 @@ class _DocumentTreeComparisonScreenState
   @override
   Widget build(BuildContext context) {
     // 对文档进行排序：先显示两边都存在的文档，再显示只在一边存在的文档
-    final sortedResults = widget.results;
+    final sortedResults = _diffResults;
 
     return Scaffold(
       appBar: AppBar(
@@ -1628,7 +1627,7 @@ class _DocumentTreeComparisonScreenState
     // 如果两边都有文档，重新比较差异
     if (sourceDoc != null && targetDoc != null) {
       // 查找现有的差异记录
-      int index = widget.results.indexWhere((diff) => diff.id == docId);
+      int index = _diffResults.indexWhere((diff) => diff.id == docId);
 
       // 重新计算字段差异
       final fieldDiffs = <String, FieldDiff>{};
@@ -1638,7 +1637,7 @@ class _DocumentTreeComparisonScreenState
       if (index >= 0) {
         // 更新现有记录
         setState(() {
-          widget.results[index] = DocumentDiff(
+          _diffResults[index] = DocumentDiff(
             id: docId,
             sourceDocument: sourceDoc,
             targetDocument: targetDoc,
@@ -1648,7 +1647,7 @@ class _DocumentTreeComparisonScreenState
       } else {
         // 添加新记录
         setState(() {
-          widget.results.add(
+          _diffResults.add(
             DocumentDiff(
               id: docId,
               sourceDocument: sourceDoc,

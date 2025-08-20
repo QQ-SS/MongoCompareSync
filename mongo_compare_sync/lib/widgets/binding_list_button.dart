@@ -180,7 +180,6 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => DocumentTreeComparisonScreen(
-          results: [],
           sourceCollection: binding.sourceCollection,
           targetCollection: binding.targetCollection,
           sourceDatabaseName: binding.sourceDatabase,
