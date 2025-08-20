@@ -160,6 +160,8 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                             onRemoveBinding: _removeBinding,
                             onScrollToBinding: _scrollBindingToVisible,
                             onClearAllBindings: _clearAllBindings,
+                            onAddBinding: _addBinding,
+                            onConnectionChange: _onConnectionChange,
                           ),
                         ),
                       ],
@@ -256,6 +258,45 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
           binding.targetDatabase == database &&
           binding.targetCollection == collection,
     );
+  }
+
+  // 添加绑定
+  void _addBinding(CollectionBinding binding) {
+    if (!_bindings.contains(binding)) {
+      setState(() {
+        _bindings.add(binding);
+      });
+    }
+  }
+
+  // 更改连接
+  void _onConnectionChange(
+    String? sourceConnectionId,
+    String? targetConnectionId,
+  ) {
+    if (sourceConnectionId != null || targetConnectionId != null) {
+      final connectionsState = ref.read(connectionsProvider);
+
+      connectionsState.whenData((connections) {
+        // 更新源连接
+        if (sourceConnectionId != null) {
+          final sourceConn = connections.firstWhere(
+            (conn) => conn.id == sourceConnectionId,
+            orElse: () => _sourceConnection ?? connections.first,
+          );
+          onSourceConnectionChanged(sourceConn);
+        }
+
+        // 更新目标连接
+        if (targetConnectionId != null) {
+          final targetConn = connections.firstWhere(
+            (conn) => conn.id == targetConnectionId,
+            orElse: () => _targetConnection ?? connections.first,
+          );
+          onTargetConnectionChanged(targetConn);
+        }
+      });
+    }
   }
 }
 
