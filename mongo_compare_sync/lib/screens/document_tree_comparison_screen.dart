@@ -205,6 +205,60 @@ class _DocumentTreeComparisonScreenState
             // 操作按钮栏
             _buildActionBar(),
 
+            // 忽略字段标签栏
+            if (_ignoredFields.isNotEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8.0,
+                  vertical: 4.0,
+                ),
+                color: Theme.of(context).colorScheme.surfaceContainerLow,
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '已忽略的字段：',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Wrap(
+                        alignment: WrapAlignment.start,
+                        spacing: 8.0,
+                        runSpacing: 4.0,
+                        children: _ignoredFields.map((field) {
+                          return Chip(
+                            label: Text(field),
+                            deleteIcon: const Icon(Icons.close, size: 16),
+                            onDeleted: () {
+                              setState(() {
+                                _ignoredFields.remove(field);
+                                _compareDocuments();
+                              });
+                            },
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                            labelStyle: const TextStyle(fontSize: 12),
+                            padding: const EdgeInsets.all(0),
+                            visualDensity: VisualDensity.compact,
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
             // 文档树视图
             Expanded(
               child: Row(
