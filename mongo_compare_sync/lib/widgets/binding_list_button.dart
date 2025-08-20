@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/collection_binding.dart';
+import '../models/comparison_task.dart';
 import '../models/connection.dart';
+import '../repositories/comparison_task_repository.dart';
 import '../screens/document_tree_comparison_screen.dart';
 
 class BindingListButton extends ConsumerStatefulWidget {
@@ -28,13 +30,12 @@ class BindingListButton extends ConsumerStatefulWidget {
 
 class _BindingListButtonState extends ConsumerState<BindingListButton> {
   bool _showBindingsList = false;
+  final ComparisonTaskRepository _taskRepository = ComparisonTaskRepository();
+  List<ComparisonTask>? _savedTasks;
+  bool _isLoadingTasks = false;
 
   @override
   Widget build(BuildContext context) {
-    if (widget.bindings.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
     return Stack(
       children: [
         // 浮动按钮，显示绑定数量
@@ -104,16 +105,31 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
                       icon: const Icon(Icons.play_arrow),
                       label: const Text('批量比较'),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () {
-                        setState(() {
-                          _showBindingsList = false;
-                        });
-                      },
-                      tooltip: '关闭',
+                    // 添加间隔
+                    const SizedBox(width: 16),
+                    // 保存任务按钮
+                    TextButton.icon(
+                      onPressed: _showSaveTaskDialog,
+                      icon: const Icon(Icons.save),
+                      label: const Text('保存任务'),
                     ),
                   ],
+                  // 加载任务按钮
+                  TextButton.icon(
+                    onPressed: _showLoadTaskDialog,
+                    icon: const Icon(Icons.folder_open),
+                    label: const Text('加载任务'),
+                  ),
+                  const SizedBox(width: 16),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () {
+                      setState(() {
+                        _showBindingsList = false;
+                      });
+                    },
+                    tooltip: '关闭',
+                  ),
                 ],
               ),
             ),
@@ -165,6 +181,160 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  // 显示保存任务对话框
+  void _showSaveTaskDialog() {
+    final TextEditingController nameController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('保存比较任务'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: '任务名称',
+                hintText: '输入任务名称',
+              ),
+              autofocus: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (nameController.text.isNotEmpty) {
+                _saveTask(nameController.text);
+                Navigator.of(context).pop();
+              }
+            },
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 保存任务
+  Future<void> _saveTask(String name) async {
+    if (widget.bindings.isEmpty) return;
+
+    // 获取当前选中的绑定
+    final binding = widget.bindings.first;
+
+    // 创建任务
+    final task = ComparisonTask(
+      name: name,
+      sourceCollection: binding.sourceCollection,
+      targetCollection: binding.targetCollection,
+      sourceDatabaseName: binding.sourceDatabase,
+      targetDatabaseName: binding.targetDatabase,
+      sourceConnectionId: widget.sourceConnection?.id,
+      targetConnectionId: widget.targetConnection?.id,
+      ignoredFields: [], // 默认为空，可以在比较界面中设置
+    );
+
+    // 保存任务
+    await _taskRepository.saveTask(task);
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('任务 "$name" 已保存')));
+  }
+
+  // 显示加载任务对话框
+  Future<void> _showLoadTaskDialog() async {
+    setState(() {
+      _isLoadingTasks = true;
+    });
+
+    // 加载所有保存的任务
+    _savedTasks = await _taskRepository.getAllTasks();
+
+    setState(() {
+      _isLoadingTasks = false;
+    });
+
+    if (_savedTasks == null || _savedTasks!.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('没有保存的任务')));
+      return;
+    }
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('加载比较任务'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: _savedTasks!.length,
+            itemBuilder: (context, index) {
+              final task = _savedTasks![index];
+              return ListTile(
+                title: Text(task.name),
+                subtitle: Text(
+                  '${task.sourceDatabaseName}.${task.sourceCollection} → ${task.targetDatabaseName}.${task.targetCollection}',
+                ),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _loadTask(task);
+                },
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete),
+                  onPressed: () async {
+                    await _taskRepository.deleteTask(task.name);
+                    setState(() {
+                      _savedTasks!.removeAt(index);
+                    });
+                    if (_savedTasks!.isEmpty) {
+                      Navigator.of(context).pop();
+                    }
+                  },
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('取消'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 加载任务
+  void _loadTask(ComparisonTask task) {
+    // 导航到比较结果页面
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => DocumentTreeComparisonScreen(
+          sourceCollection: task.sourceCollection,
+          targetCollection: task.targetCollection,
+          sourceDatabaseName: task.sourceDatabaseName,
+          targetDatabaseName: task.targetDatabaseName,
+          sourceConnectionId: task.sourceConnectionId,
+          targetConnectionId: task.targetConnectionId,
+          idField: task.idField,
+          ignoredFields: task.ignoredFields,
         ),
       ),
     );
