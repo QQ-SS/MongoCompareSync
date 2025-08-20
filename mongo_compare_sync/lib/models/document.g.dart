@@ -32,7 +32,7 @@ DocumentDiff _$DocumentDiffFromJson(Map<String, dynamic> json) => DocumentDiff(
   targetDocument: json['targetDocument'] == null
       ? null
       : json['targetDocument'] as Map<String, dynamic>,
-  fieldDiffs: json['fieldDiffs'] as Map<String, dynamic>?,
+  fieldDiffs: json['fieldDiffs'] as List<String>?,
 );
 
 Map<String, dynamic> _$DocumentDiffToJson(DocumentDiff instance) =>

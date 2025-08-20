@@ -34,18 +34,19 @@ class DocumentTreeComparisonScreen extends ConsumerStatefulWidget {
 
 class _DocumentTreeComparisonScreenState
     extends ConsumerState<DocumentTreeComparisonScreen> {
+  // 存储完整文档数据
+  final Map<String, Map<String, dynamic>> _sourceDocuments = {};
+  final Map<String, Map<String, dynamic>> _targetDocuments = {};
+
+  // 存储差异字段映射
   final List<DocumentDiff> _diffResults = [];
+
   // 存储展开状态
   final Map<String, bool> _expandedDocuments = {};
 
   // 存储选中的节点路径
   String? _selectedSourcePath;
   String? _selectedTargetPath;
-
-  // 存储完整文档数据
-  final Map<String, Map<String, dynamic>> _sourceDocuments = {};
-  final Map<String, Map<String, dynamic>> _targetDocuments = {};
-
   // 加载状态
   bool _isLoading = true;
 
@@ -171,7 +172,7 @@ class _DocumentTreeComparisonScreenState
         final targetDoc = _targetDocuments[docId];
 
         // 比较文档字段
-        final fieldDiffs = <String, FieldDiff>{};
+        final fieldDiffs = <String>[];
         if (sourceDoc != null && targetDoc != null) {
           _compareDocument(sourceDoc, targetDoc, '', fieldDiffs);
         }
@@ -200,7 +201,7 @@ class _DocumentTreeComparisonScreenState
     Map<String, dynamic> sourceDoc,
     Map<String, dynamic> targetDoc,
     String parentPath,
-    Map<String, FieldDiff> fieldDiffs,
+    List<String> fieldDiffs,
   ) {
     // 获取所有字段名
     final Set<String> allFields = {...sourceDoc.keys, ...targetDoc.keys};
@@ -218,22 +219,18 @@ class _DocumentTreeComparisonScreenState
 
       // 字段只存在于一侧
       if (!sourceDoc.containsKey(field)) {
-        fieldDiffs[fieldPath] = FieldDiff(
-          fieldPath: fieldPath,
-          sourceValue: null,
-          targetValue: targetValue,
-          status: 'added',
-        );
+        // 添加差异字段路径
+        if (!fieldDiffs.contains(fieldPath)) {
+          fieldDiffs.add(fieldPath);
+        }
         continue;
       }
 
       if (!targetDoc.containsKey(field)) {
-        fieldDiffs[fieldPath] = FieldDiff(
-          fieldPath: fieldPath,
-          sourceValue: sourceValue,
-          targetValue: null,
-          status: 'removed',
-        );
+        // 添加差异字段路径
+        if (!fieldDiffs.contains(fieldPath)) {
+          fieldDiffs.add(fieldPath);
+        }
         continue;
       }
 
@@ -247,13 +244,10 @@ class _DocumentTreeComparisonScreenState
           fieldDiffs,
         );
       } else if (sourceValue != targetValue) {
-        // 值不同
-        fieldDiffs[fieldPath] = FieldDiff(
-          fieldPath: fieldPath,
-          sourceValue: sourceValue,
-          targetValue: targetValue,
-          status: 'modified',
-        );
+        // 值不同，添加差异字段路径
+        if (!fieldDiffs.contains(fieldPath)) {
+          fieldDiffs.add(fieldPath);
+        }
       }
     }
   }
@@ -777,7 +771,7 @@ class _DocumentTreeComparisonScreenState
       final bool isIgnored = widget.ignoredFields.contains(key);
 
       // 检查字段是否有差异
-      final bool hasDiff = _hasFieldDiff(diff, key);
+      final bool hasDiff = _hasFieldDiff(diff, fieldPath);
 
       // 字段值的显示文本
       String valueText;
@@ -915,7 +909,7 @@ class _DocumentTreeComparisonScreenState
   Widget _getDocumentIcon(DocumentDiff diff, bool isSource) {
     return diff.sourceDocument == null || diff.targetDocument == null
         ? Icon(Icons.add_circle, color: isSource ? Colors.green : Colors.grey)
-        : diff.fieldDiffs?.keys.isEmpty == true
+        : diff.fieldDiffs?.isEmpty == true
         ? const Icon(Icons.check_circle, color: Colors.green)
         : const Icon(Icons.edit, color: Colors.amber);
   }
@@ -926,7 +920,7 @@ class _DocumentTreeComparisonScreenState
         ? (diff.sourceDocument != null
               ? (isSource ? '仅在源中存在' : '不存在')
               : (!isSource ? '仅在目标中存在' : '不存在'))
-        : diff.fieldDiffs?.keys.isEmpty == true
+        : diff.fieldDiffs?.isEmpty == true
         ? '相同'
         : '已修改';
   }
@@ -960,7 +954,7 @@ class _DocumentTreeComparisonScreenState
   // 检查字段是否有差异
   bool _hasFieldDiff(DocumentDiff diff, String fieldPath) {
     if (diff.fieldDiffs == null) return false;
-    return diff.fieldDiffs!.containsKey(fieldPath);
+    return diff.fieldDiffs!.contains(fieldPath);
   }
 
   // 复制到源
@@ -1630,7 +1624,7 @@ class _DocumentTreeComparisonScreenState
       int index = _diffResults.indexWhere((diff) => diff.id == docId);
 
       // 重新计算字段差异
-      final fieldDiffs = <String, FieldDiff>{};
+      final fieldDiffs = <String>[];
       _compareDocument(sourceDoc, targetDoc, '', fieldDiffs);
 
       // 更新差异记录

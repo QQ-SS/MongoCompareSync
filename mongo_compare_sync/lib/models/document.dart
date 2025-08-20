@@ -48,7 +48,7 @@ class DocumentDiff {
   final String id;
   final Map<String, dynamic>? sourceDocument;
   final Map<String, dynamic>? targetDocument;
-  final Map<String, dynamic>? fieldDiffs;
+  final List<String>? fieldDiffs;
 
   DocumentDiff({
     required this.id,
@@ -66,7 +66,7 @@ class DocumentDiff {
     String? id,
     Map<String, dynamic>? sourceDocument,
     Map<String, dynamic>? targetDocument,
-    Map<String, dynamic>? fieldDiffs,
+    List<String>? fieldDiffs,
   }) {
     return DocumentDiff(
       id: id ?? this.id,
