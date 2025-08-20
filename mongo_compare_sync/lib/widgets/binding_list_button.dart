@@ -250,7 +250,6 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
       bindings: bindingConfigs,
       sourceConnectionId: widget.sourceConnection?.id,
       targetConnectionId: widget.targetConnection?.id,
-      ignoredFields: [], // 默认为空，可以在比较界面中设置
     );
 
     // 保存任务
@@ -396,10 +395,8 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
           targetDatabaseName: binding.targetDatabaseName,
           sourceConnectionId: task.sourceConnectionId,
           targetConnectionId: task.targetConnectionId,
-          idField: binding.idField ?? task.idField,
-          ignoredFields: binding.ignoredFields.isNotEmpty
-              ? binding.ignoredFields
-              : task.ignoredFields,
+          idField: binding.idField,
+          ignoredFields: binding.ignoredFields,
         ),
       ),
     );

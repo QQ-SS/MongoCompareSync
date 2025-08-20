@@ -49,16 +49,12 @@ class ComparisonTask {
   final List<BindingConfig> bindings;
   final String? sourceConnectionId;
   final String? targetConnectionId;
-  final String? idField;
-  final List<String> ignoredFields;
 
   ComparisonTask({
     required this.name,
     required this.bindings,
     this.sourceConnectionId,
     this.targetConnectionId,
-    this.idField = '_id',
-    this.ignoredFields = const [],
   });
 
   // 从单个绑定创建任务
@@ -87,8 +83,6 @@ class ComparisonTask {
       ],
       sourceConnectionId: sourceConnectionId,
       targetConnectionId: targetConnectionId,
-      idField: idField ?? '_id',
-      ignoredFields: ignoredFields ?? [],
     );
   }
 
@@ -101,12 +95,6 @@ class ComparisonTask {
           .toList(),
       sourceConnectionId: json['sourceConnectionId'] as String?,
       targetConnectionId: json['targetConnectionId'] as String?,
-      idField: json['idField'] as String? ?? '_id',
-      ignoredFields:
-          (json['ignoredFields'] as List<dynamic>?)
-              ?.map((e) => e as String)
-              .toList() ??
-          [],
     );
   }
 
@@ -117,8 +105,6 @@ class ComparisonTask {
       'bindings': bindings.map((e) => e.toJson()).toList(),
       'sourceConnectionId': sourceConnectionId,
       'targetConnectionId': targetConnectionId,
-      'idField': idField,
-      'ignoredFields': ignoredFields,
     };
   }
 
