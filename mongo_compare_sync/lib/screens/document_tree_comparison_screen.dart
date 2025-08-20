@@ -55,7 +55,7 @@ class _DocumentTreeComparisonScreenState
   // 加载状态
   bool _isLoading = true;
   // 存储忽略的字段列表（可变）
-  final List<String> _ignoredFields = [];
+  List<String> _ignoredFields = [];
 
   // 操作状态
   bool _isProcessing = false;
@@ -89,6 +89,7 @@ class _DocumentTreeComparisonScreenState
   void initState() {
     super.initState();
     // 在didChangeDependencies中初始化
+    _ignoredFields = [..._ignoredFields, ...widget.ignoredFields];
   }
 
   // 构建操作按钮栏
@@ -627,7 +628,7 @@ class _DocumentTreeComparisonScreenState
     for (final field in allFields) {
       // 跳过忽略的字段
       if (field == "_id" && widget.idField == "_id") continue;
-      if (widget.ignoredFields.contains(field)) continue;
+      if (_ignoredFields.contains(field)) continue;
 
       final String fieldPath = parentPath.isEmpty
           ? field
