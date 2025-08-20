@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mongo_dart/mongo_dart.dart' hide Center;
+
 import '../models/document.dart';
-import '../services/mongo_service.dart';
 import '../providers/connection_provider.dart';
+import '../services/mongo_service.dart';
 
 class DocumentTreeComparisonScreen extends ConsumerStatefulWidget {
   final String sourceCollection;
@@ -58,238 +59,6 @@ class _DocumentTreeComparisonScreenState
   late final MongoService _mongoService;
 
   @override
-  void initState() {
-    super.initState();
-    // 在didChangeDependencies中初始化
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _mongoService = ref.read(mongoServiceProvider);
-    _loadDocuments();
-  }
-
-  // 从数据库重新加载数据
-  Future<void> _reloadFromDatabase() async {
-    await _loadDocuments();
-  }
-
-  // 重新比较文档
-
-  // 加载完整文档数据
-  Future<void> _loadDocuments() async {
-    setState(() {
-      _isLoading = true;
-      _sourceDocuments.clear();
-      _targetDocuments.clear();
-    });
-
-    try {
-      // 从源数据库加载全量文档
-      if (widget.sourceConnectionId != null) {
-        try {
-          final sourceDocs = await _mongoService.getDocuments(
-            widget.sourceConnectionId!,
-            widget.sourceDatabaseName,
-            widget.sourceCollection,
-            limit: 0, // 获取所有文档
-          );
-
-          print('从源数据库加载了 ${sourceDocs.length} 个文档');
-
-          // 将文档添加到源文档映射中
-          for (final doc in sourceDocs) {
-            var docId = _extractDocumentId(doc.data);
-            _sourceDocuments[docId] = doc.data;
-          }
-        } catch (e) {
-          print('加载源数据库文档失败: $e');
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('加载源数据库文档失败: $e')));
-        }
-      }
-
-      // 从目标数据库加载全量文档
-      if (widget.targetConnectionId != null) {
-        try {
-          final targetDocs = await _mongoService.getDocuments(
-            widget.targetConnectionId!,
-            widget.targetDatabaseName,
-            widget.targetCollection,
-            limit: 0, // 获取所有文档
-          );
-
-          print('从目标数据库加载了 ${targetDocs.length} 个文档');
-
-          // 将文档添加到目标文档映射中
-          for (final doc in targetDocs) {
-            var docId = _extractDocumentId(doc.data);
-            _targetDocuments[docId] = doc.data;
-          }
-        } catch (e) {
-          print('加载目标数据库文档失败: $e');
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('加载目标数据库文档失败: $e')));
-        }
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('加载文档失败: $e')));
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  // 比较文档
-  Future<void> _compareDocuments() async {
-    if (_sourceDocuments.isEmpty || _targetDocuments.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('请先加载文档数据')));
-      return;
-    }
-    setState(() {
-      _isProcessing = true;
-      _processingMessage = '正在比较文档...';
-    });
-
-    try {
-      _diffResults.clear();
-      // 取源、目标文档的所有id并集，然后进行比较
-      final ids = {..._sourceDocuments.keys, ..._targetDocuments.keys}.toList();
-      // 更新差异状态
-      for (int i = 0; i < ids.length; i++) {
-        final docId = ids[i];
-        final sourceDoc = _sourceDocuments[docId];
-        final targetDoc = _targetDocuments[docId];
-
-        // 比较文档字段
-        final fieldDiffs = <String>[];
-        if (sourceDoc != null && targetDoc != null) {
-          _compareDocument(sourceDoc, targetDoc, '', fieldDiffs);
-        }
-        _diffResults.add(
-          DocumentDiff(
-            id: docId,
-            sourceDocument: sourceDoc,
-            targetDocument: targetDoc,
-            fieldDiffs: fieldDiffs,
-          ),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('比较文档失败: $e')));
-    } finally {
-      setState(() {
-        _isProcessing = false;
-      });
-    }
-  }
-
-  // 比较两个文档的字段
-  void _compareDocument(
-    Map<String, dynamic> sourceDoc,
-    Map<String, dynamic> targetDoc,
-    String parentPath,
-    List<String> fieldDiffs,
-  ) {
-    // 获取所有字段名
-    final Set<String> allFields = {...sourceDoc.keys, ...targetDoc.keys};
-
-    for (final field in allFields) {
-      // 跳过忽略的字段
-      if (field == "_id" && widget.idField == "_id") continue;
-      if (widget.ignoredFields.contains(field)) continue;
-
-      final String fieldPath = parentPath.isEmpty
-          ? field
-          : '$parentPath.$field';
-      final sourceValue = sourceDoc[field];
-      final targetValue = targetDoc[field];
-
-      // 字段只存在于一侧
-      if (!sourceDoc.containsKey(field)) {
-        // 添加差异字段路径
-        if (!fieldDiffs.contains(fieldPath)) {
-          fieldDiffs.add(fieldPath);
-        }
-        continue;
-      }
-
-      if (!targetDoc.containsKey(field)) {
-        // 添加差异字段路径
-        if (!fieldDiffs.contains(fieldPath)) {
-          fieldDiffs.add(fieldPath);
-        }
-        continue;
-      }
-
-      // 两侧都有字段，比较值
-      if (sourceValue is Map && targetValue is Map) {
-        // 递归比较嵌套对象
-        _compareDocument(
-          Map<String, dynamic>.from(sourceValue),
-          Map<String, dynamic>.from(targetValue),
-          fieldPath,
-          fieldDiffs,
-        );
-      } else if (sourceValue is List && targetValue is List) {
-        // 比较数组
-        if (sourceValue.length != targetValue.length) {
-          // 数组长度不同，添加差异字段路径
-          if (!fieldDiffs.contains(fieldPath)) {
-            fieldDiffs.add(fieldPath);
-          }
-        } else {
-          // 数组长度相同，逐个比较元素
-          for (int i = 0; i < sourceValue.length; i++) {
-            final sourceItem = sourceValue[i];
-            final targetItem = targetValue[i];
-
-            if (sourceItem is Map && targetItem is Map) {
-              // 递归比较嵌套对象
-              _compareDocument(
-                Map<String, dynamic>.from(sourceItem),
-                Map<String, dynamic>.from(targetItem),
-                '$fieldPath[$i]',
-                fieldDiffs,
-              );
-            } else if (sourceItem != targetItem) {
-              // 值不同，添加差异字段路径
-              final itemPath = '$fieldPath[$i]';
-              if (!fieldDiffs.contains(itemPath)) {
-                fieldDiffs.add(itemPath);
-              }
-            }
-          }
-        }
-      } else if (sourceValue != targetValue) {
-        // 值不同，添加差异字段路径
-        if (!fieldDiffs.contains(fieldPath)) {
-          fieldDiffs.add(fieldPath);
-        }
-      }
-    }
-  }
-
-  /// 从文档中提取ID字段的值
-  String _extractDocumentId(Map<String, dynamic> doc) {
-    return (doc.containsKey(widget.idField))
-        ? doc[widget.idField].toString()
-        : doc['_id'].toString();
-  }
-
-  @override
   Widget build(BuildContext context) {
     // 对文档进行排序：先显示两边都存在的文档，再显示只在一边存在的文档
     final sortedResults = _diffResults;
@@ -306,69 +75,17 @@ class _DocumentTreeComparisonScreenState
     );
   }
 
-  // 构建比较视图
-  Widget _buildComparisonView(List<DocumentDiff> sortedResults) {
-    return Stack(
-      children: [
-        Column(
-          children: [
-            // 操作按钮栏
-            _buildActionBar(),
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _mongoService = ref.read(mongoServiceProvider);
+    _loadDocuments();
+  }
 
-            // 文档树视图
-            Expanded(
-              child: Row(
-                children: [
-                  // 源文档树
-                  Expanded(
-                    child: _buildDocumentTree(
-                      sortedResults,
-                      isSource: true,
-                      title: '源集合',
-                      collection: widget.sourceCollection,
-                    ),
-                  ),
-
-                  // 中间分隔线
-                  Container(width: 1, color: Theme.of(context).dividerColor),
-
-                  // 目标文档树
-                  Expanded(
-                    child: _buildDocumentTree(
-                      sortedResults,
-                      isSource: false,
-                      title: '目标集合',
-                      collection: widget.targetCollection,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-
-        // 处理中遮罩
-        if (_isProcessing)
-          Container(
-            color: Colors.black54,
-            child: Center(
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const CircularProgressIndicator(),
-                      const SizedBox(height: 16),
-                      Text(_processingMessage ?? '处理中...'),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
+  @override
+  void initState() {
+    super.initState();
+    // 在didChangeDependencies中初始化
   }
 
   // 构建操作按钮栏
@@ -488,142 +205,68 @@ class _DocumentTreeComparisonScreenState
     );
   }
 
-  // 构建文档树
-  Widget _buildDocumentTree(
-    List<DocumentDiff> diffs, {
-    required bool isSource,
-    required String title,
-    required String collection,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  // 构建比较视图
+  Widget _buildComparisonView(List<DocumentDiff> sortedResults) {
+    return Stack(
       children: [
-        // 标题栏
-        Container(
-          padding: const EdgeInsets.all(8.0),
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          width: double.infinity,
-          child: Text(
-            '$title: $collection',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
+        Column(
+          children: [
+            // 操作按钮栏
+            _buildActionBar(),
+
+            // 文档树视图
+            Expanded(
+              child: Row(
+                children: [
+                  // 源文档树
+                  Expanded(
+                    child: _buildDocumentTree(
+                      sortedResults,
+                      isSource: true,
+                      title: '源集合',
+                      collection: widget.sourceCollection,
+                    ),
+                  ),
+
+                  // 中间分隔线
+                  Container(width: 1, color: Theme.of(context).dividerColor),
+
+                  // 目标文档树
+                  Expanded(
+                    child: _buildDocumentTree(
+                      sortedResults,
+                      isSource: false,
+                      title: '目标集合',
+                      collection: widget.targetCollection,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
 
-        // 文档列表
-        Expanded(
-          child: ListView.builder(
-            itemCount: diffs.length,
-            itemBuilder: (context, index) {
-              final diff = diffs[index];
-              return _buildDocumentItem(diff, isSource);
-            },
+        // 处理中遮罩
+        if (_isProcessing)
+          Container(
+            color: Colors.black54,
+            child: Center(
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const CircularProgressIndicator(),
+                      const SizedBox(height: 16),
+                      Text(_processingMessage ?? '处理中...'),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
-        ),
       ],
-    );
-  }
-
-  // 构建文档项
-  Widget _buildDocumentItem(DocumentDiff diff, bool isSource) {
-    final String docId = diff.id;
-    final bool isExpanded = _expandedDocuments[docId] ?? false;
-
-    // 获取文档数据
-    final Map<String, dynamic>? docData = isSource
-        ? _sourceDocuments[docId]
-        : _targetDocuments[docId];
-
-    // 如果文档不存在，显示占位符
-    if (docData == null) {
-      return Card(
-        margin: const EdgeInsets.all(4.0),
-        color: Theme.of(context).colorScheme.surfaceContainerLowest,
-        child: ListTile(
-          title: Text(
-            '文档不存在: $docId',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.outline,
-              fontStyle: FontStyle.italic,
-            ),
-          ),
-        ),
-      );
-    }
-
-    // 判断是否被选中
-    final bool isSelected = isSource
-        ? _selectedSourcePath == docId
-        : _selectedTargetPath == docId;
-
-    // 构建文档卡片
-    return Card(
-      margin: const EdgeInsets.all(4.0),
-      color: isSelected ? Theme.of(context).colorScheme.primaryContainer : null,
-      elevation: isSelected ? 4 : 1,
-      child: Column(
-        children: [
-          // 文档标题行
-          ListTile(
-            title: Text(
-              '文档 ID: $docId',
-              style: TextStyle(
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected
-                    ? Theme.of(context).colorScheme.onPrimaryContainer
-                    : null,
-              ),
-            ),
-            subtitle: Text(
-              _getDocumentStatusText(diff, isSource),
-              style: TextStyle(
-                color: isSelected
-                    ? Theme.of(context).colorScheme.onPrimaryContainer
-                    : null,
-              ),
-            ),
-            leading: _getDocumentIcon(diff, isSource),
-            trailing: IconButton(
-              icon: Icon(isExpanded ? Icons.expand_less : Icons.expand_more),
-              onPressed: () {
-                setState(() {
-                  _expandedDocuments[docId] = !isExpanded;
-                });
-              },
-            ),
-            selected: isSelected,
-            onTap: () {
-              setState(() {
-                if (isSource) {
-                  _selectedSourcePath = _selectedSourcePath == docId
-                      ? null
-                      : docId;
-                  _selectedTargetPath = null;
-                } else {
-                  _selectedTargetPath = _selectedTargetPath == docId
-                      ? null
-                      : docId;
-                  _selectedSourcePath = null;
-                }
-              });
-            },
-          ),
-
-          // 展开的文档属性
-          if (isExpanded)
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16.0,
-                vertical: 8.0,
-              ),
-              child: _buildDocumentFields(
-                docData,
-                diff,
-                isSource,
-                parentPath: docId,
-              ),
-            ),
-        ],
-      ),
     );
   }
 
@@ -780,6 +423,145 @@ class _DocumentTreeComparisonScreenState
     );
   }
 
+  // 构建文档项
+  Widget _buildDocumentItem(DocumentDiff diff, bool isSource) {
+    final String docId = diff.id;
+    final bool isExpanded = _expandedDocuments[docId] ?? false;
+
+    // 获取文档数据
+    final Map<String, dynamic>? docData = isSource
+        ? _sourceDocuments[docId]
+        : _targetDocuments[docId];
+
+    // 如果文档不存在，显示占位符
+    if (docData == null) {
+      return Card(
+        margin: const EdgeInsets.all(4.0),
+        color: Theme.of(context).colorScheme.surfaceContainerLowest,
+        child: ListTile(
+          title: Text(
+            '文档不存在: $docId',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.outline,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ),
+      );
+    }
+
+    // 判断是否被选中
+    final bool isSelected = isSource
+        ? _selectedSourcePath == docId
+        : _selectedTargetPath == docId;
+
+    // 构建文档卡片
+    return Card(
+      margin: const EdgeInsets.all(4.0),
+      color: isSelected ? Theme.of(context).colorScheme.primaryContainer : null,
+      elevation: isSelected ? 4 : 1,
+      child: Column(
+        children: [
+          // 文档标题行
+          ListTile(
+            title: Text(
+              '文档 ID: $docId',
+              style: TextStyle(
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected
+                    ? Theme.of(context).colorScheme.onPrimaryContainer
+                    : null,
+              ),
+            ),
+            subtitle: Text(
+              _getDocumentStatusText(diff, isSource),
+              style: TextStyle(
+                color: isSelected
+                    ? Theme.of(context).colorScheme.onPrimaryContainer
+                    : null,
+              ),
+            ),
+            leading: _getDocumentIcon(diff, isSource),
+            trailing: IconButton(
+              icon: Icon(isExpanded ? Icons.expand_less : Icons.expand_more),
+              onPressed: () {
+                setState(() {
+                  _expandedDocuments[docId] = !isExpanded;
+                });
+              },
+            ),
+            selected: isSelected,
+            onTap: () {
+              setState(() {
+                if (isSource) {
+                  _selectedSourcePath = _selectedSourcePath == docId
+                      ? null
+                      : docId;
+                  _selectedTargetPath = null;
+                } else {
+                  _selectedTargetPath = _selectedTargetPath == docId
+                      ? null
+                      : docId;
+                  _selectedSourcePath = null;
+                }
+              });
+            },
+          ),
+
+          // 展开的文档属性
+          if (isExpanded)
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: 8.0,
+              ),
+              child: _buildDocumentFields(
+                docData,
+                diff,
+                isSource,
+                parentPath: docId,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // 构建文档树
+  Widget _buildDocumentTree(
+    List<DocumentDiff> diffs, {
+    required bool isSource,
+    required String title,
+    required String collection,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 标题栏
+        Container(
+          padding: const EdgeInsets.all(8.0),
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          width: double.infinity,
+          child: Text(
+            '$title: $collection',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+        ),
+
+        // 文档列表
+        Expanded(
+          child: ListView.builder(
+            itemCount: diffs.length,
+            itemBuilder: (context, index) {
+              final diff = diffs[index];
+              return _buildDocumentItem(diff, isSource);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
   // 构建嵌套字段
   Widget _buildNestedFields(
     Map<String, dynamic> data,
@@ -933,100 +715,138 @@ class _DocumentTreeComparisonScreenState
     );
   }
 
-  // 获取文档图标
-  Widget _getDocumentIcon(DocumentDiff diff, bool isSource) {
-    return diff.sourceDocument == null || diff.targetDocument == null
-        ? Icon(Icons.add_circle, color: isSource ? Colors.green : Colors.grey)
-        : diff.fieldDiffs?.isEmpty == true
-        ? const Icon(Icons.check_circle, color: Colors.green)
-        : const Icon(Icons.edit, color: Colors.amber);
-  }
-
-  // 获取文档状态文本
-  String _getDocumentStatusText(DocumentDiff diff, bool isSource) {
-    return diff.sourceDocument == null || diff.targetDocument == null
-        ? (diff.sourceDocument != null
-              ? (isSource ? '仅在源中存在' : '不存在')
-              : (!isSource ? '仅在目标中存在' : '不存在'))
-        : diff.fieldDiffs?.isEmpty == true
-        ? '相同'
-        : '已修改';
-  }
-
-  // 获取字段背景颜色
-  Color _getFieldBackgroundColor(
-    bool isSelected,
-    bool isIgnored,
-    bool hasDiff,
+  // 比较两个文档的字段
+  void _compareDocument(
+    Map<String, dynamic> sourceDoc,
+    Map<String, dynamic> targetDoc,
+    String parentPath,
+    List<String> fieldDiffs,
   ) {
-    if (isSelected) {
-      return Theme.of(context).colorScheme.primaryContainer;
+    // 获取所有字段名
+    final Set<String> allFields = {...sourceDoc.keys, ...targetDoc.keys};
+
+    for (final field in allFields) {
+      // 跳过忽略的字段
+      if (field == "_id" && widget.idField == "_id") continue;
+      if (widget.ignoredFields.contains(field)) continue;
+
+      final String fieldPath = parentPath.isEmpty
+          ? field
+          : '$parentPath.$field';
+      final sourceValue = sourceDoc[field];
+      final targetValue = targetDoc[field];
+
+      // 字段只存在于一侧
+      if (!sourceDoc.containsKey(field)) {
+        // 添加差异字段路径
+        if (!fieldDiffs.contains(fieldPath)) {
+          fieldDiffs.add(fieldPath);
+        }
+        continue;
+      }
+
+      if (!targetDoc.containsKey(field)) {
+        // 添加差异字段路径
+        if (!fieldDiffs.contains(fieldPath)) {
+          fieldDiffs.add(fieldPath);
+        }
+        continue;
+      }
+
+      // 两侧都有字段，比较值
+      if (sourceValue is Map && targetValue is Map) {
+        // 递归比较嵌套对象
+        _compareDocument(
+          Map<String, dynamic>.from(sourceValue),
+          Map<String, dynamic>.from(targetValue),
+          fieldPath,
+          fieldDiffs,
+        );
+      } else if (sourceValue is List && targetValue is List) {
+        // 比较数组
+        if (sourceValue.length != targetValue.length) {
+          // 数组长度不同，添加差异字段路径
+          if (!fieldDiffs.contains(fieldPath)) {
+            fieldDiffs.add(fieldPath);
+          }
+        } else {
+          // 数组长度相同，逐个比较元素
+          for (int i = 0; i < sourceValue.length; i++) {
+            final sourceItem = sourceValue[i];
+            final targetItem = targetValue[i];
+
+            if (sourceItem is Map && targetItem is Map) {
+              // 递归比较嵌套对象
+              _compareDocument(
+                Map<String, dynamic>.from(sourceItem),
+                Map<String, dynamic>.from(targetItem),
+                '$fieldPath[$i]',
+                fieldDiffs,
+              );
+            } else if (sourceItem != targetItem) {
+              // 值不同，添加差异字段路径
+              final itemPath = '$fieldPath[$i]';
+              if (!fieldDiffs.contains(itemPath)) {
+                fieldDiffs.add(itemPath);
+              }
+            }
+          }
+        }
+      } else if (sourceValue != targetValue) {
+        // 值不同，添加差异字段路径
+        if (!fieldDiffs.contains(fieldPath)) {
+          fieldDiffs.add(fieldPath);
+        }
+      }
     }
-    if (hasDiff) {
-      return Colors.amber.withOpacity(0.1);
-    }
-    return Colors.transparent;
   }
 
-  // 获取字段文本颜色
-  Color _getFieldTextColor(bool isIgnored, bool hasDiff) {
-    if (isIgnored) {
-      return Theme.of(context).colorScheme.outline;
+  // 比较文档
+  Future<void> _compareDocuments() async {
+    if (_sourceDocuments.isEmpty || _targetDocuments.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请先加载文档数据')));
+      return;
     }
-    if (hasDiff) {
-      return Theme.of(context).colorScheme.error;
+    setState(() {
+      _isProcessing = true;
+      _processingMessage = '正在比较文档...';
+    });
+
+    try {
+      _diffResults.clear();
+      // 取源、目标文档的所有id并集，然后进行比较
+      final ids = {..._sourceDocuments.keys, ..._targetDocuments.keys}.toList();
+      // 更新差异状态
+      for (int i = 0; i < ids.length; i++) {
+        final docId = ids[i];
+        final sourceDoc = _sourceDocuments[docId];
+        final targetDoc = _targetDocuments[docId];
+
+        // 比较文档字段
+        final fieldDiffs = <String>[];
+        if (sourceDoc != null && targetDoc != null) {
+          _compareDocument(sourceDoc, targetDoc, '', fieldDiffs);
+        }
+        _diffResults.add(
+          DocumentDiff(
+            id: docId,
+            sourceDocument: sourceDoc,
+            targetDocument: targetDoc,
+            fieldDiffs: fieldDiffs,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('比较文档失败: $e')));
+    } finally {
+      setState(() {
+        _isProcessing = false;
+      });
     }
-    return Theme.of(context).colorScheme.onSurface;
-  }
-
-  // 检查字段是否有差异
-  bool _hasFieldDiff(DocumentDiff diff, String fieldPath) {
-    if (diff.fieldDiffs == null) return false;
-
-    // 检查完全匹配
-    if (diff.fieldDiffs!.contains(fieldPath)) return true;
-
-    // 检查前缀匹配（对于嵌套字段）
-    final String prefix = '$fieldPath.';
-    for (final path in diff.fieldDiffs!) {
-      if (path.startsWith(prefix)) return true;
-    }
-
-    // 检查数组元素匹配
-    final String arrayPrefix = '$fieldPath[';
-    for (final path in diff.fieldDiffs!) {
-      if (path.startsWith(arrayPrefix)) return true;
-    }
-
-    return false;
-  }
-
-  // 复制到源或目标
-  Future<void> _copyToDirection(bool toSource) async {
-    final selectedPath = toSource ? _selectedTargetPath : _selectedSourcePath;
-    if (selectedPath == null) return;
-
-    final parts = selectedPath.split('.');
-    final docId = parts.first;
-
-    // 检查是否为文档级别操作
-    if (parts.length == 1) {
-      await _copyDocument(docId, toSource);
-    } else {
-      // 字段级别操作
-      final fieldPath = parts.sublist(1).join('.');
-      await _copyField(docId, fieldPath, toSource);
-    }
-  }
-
-  // 复制到源
-  Future<void> _copyToSource() async {
-    await _copyToDirection(true);
-  }
-
-  // 复制到目标
-  Future<void> _copyToTarget() async {
-    await _copyToDirection(false);
   }
 
   // 将文档ID转换为ObjectId
@@ -1058,9 +878,149 @@ class _DocumentTreeComparisonScreenState
     }
   }
 
-  // 删除源或目标
-  Future<void> _deleteFromDirection(bool isSource) async {
-    final selectedPath = isSource ? _selectedSourcePath : _selectedTargetPath;
+  // 复制文档（统一处理源和目标）
+  Future<void> _copyDocument(String docId, bool toSource) async {
+    final String? connectionId = toSource
+        ? widget.sourceConnectionId
+        : widget.targetConnectionId;
+    if (connectionId == null) return;
+
+    // 获取源文档和目标文档
+    final sourceDoc = toSource
+        ? _targetDocuments[docId]
+        : _sourceDocuments[docId];
+    final targetMap = toSource ? _sourceDocuments : _targetDocuments;
+
+    if (sourceDoc == null) return;
+
+    setState(() {
+      _isProcessing = true;
+      _processingMessage = '正在复制文档${toSource ? '到源' : '到目标'}...';
+    });
+
+    try {
+      // 检查目标文档是否已存在
+      final targetDoc = targetMap[docId];
+      if (targetDoc != null) {
+        // 文档已存在，使用更新
+        final objectId = _convertToObjectId(docId);
+        final docToUpdate = Map<String, dynamic>.from(sourceDoc);
+        docToUpdate.remove('_id'); // 移除_id字段，避免更新错误
+        await _mongoService.updateDocument(
+          connectionId,
+          toSource ? widget.sourceDatabaseName : widget.targetDatabaseName,
+          toSource ? widget.sourceCollection : widget.targetCollection,
+          objectId,
+          docToUpdate,
+        );
+      } else {
+        // 文档不存在，使用插入
+        await _mongoService.insertDocument(
+          connectionId,
+          toSource ? widget.sourceDatabaseName : widget.targetDatabaseName,
+          toSource ? widget.sourceCollection : widget.targetCollection,
+          sourceDoc,
+        );
+      }
+
+      // 更新本地数据
+      setState(() {
+        targetMap[docId] = Map<String, dynamic>.from(sourceDoc);
+      });
+
+      // 更新文档差异状态
+      _updateDocumentDiff(docId);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('复制文档${toSource ? '到源' : '到目标'}失败: $e')),
+      );
+    } finally {
+      setState(() {
+        _isProcessing = false;
+      });
+    }
+  }
+
+  // 复制字段（统一处理源和目标）
+  Future<void> _copyField(String docId, String fieldPath, bool toSource) async {
+    final String? connectionId = toSource
+        ? widget.sourceConnectionId
+        : widget.targetConnectionId;
+    if (connectionId == null) return;
+
+    // 获取源文档和目标文档
+    final sourceDocMap = toSource ? _targetDocuments : _sourceDocuments;
+    final targetDocMap = toSource ? _sourceDocuments : _targetDocuments;
+
+    final sourceDoc = sourceDocMap[docId];
+    if (sourceDoc == null) return;
+
+    setState(() {
+      _isProcessing = true;
+      _processingMessage = '正在复制字段${toSource ? '到源' : '到目标'}...';
+    });
+
+    try {
+      // 从源文档中获取字段值
+      final fieldValue = _getNestedValue(sourceDoc, fieldPath.split('.'));
+
+      // 检查目标文档是否存在
+      final targetDoc = targetDocMap[docId];
+      final objectId = _convertToObjectId(docId);
+
+      if (targetDoc == null) {
+        // 目标文档不存在，需要先创建一个空文档
+        // 创建一个只包含_id和要复制字段的新文档
+        final Map<String, dynamic> newDoc = {'_id': objectId};
+        _setNestedValue(newDoc, fieldPath.split('.'), fieldValue);
+
+        // 插入新文档
+        await _mongoService.insertDocument(
+          connectionId,
+          toSource ? widget.sourceDatabaseName : widget.targetDatabaseName,
+          toSource ? widget.sourceCollection : widget.targetCollection,
+          newDoc,
+        );
+
+        // 更新本地数据
+        setState(() {
+          targetDocMap[docId] = newDoc;
+        });
+      } else {
+        // 目标文档存在，使用updateField更新字段
+        await _mongoService.updateField(
+          connectionId,
+          toSource ? widget.sourceDatabaseName : widget.targetDatabaseName,
+          toSource ? widget.sourceCollection : widget.targetCollection,
+          objectId,
+          fieldPath,
+          fieldValue,
+        );
+
+        // 更新本地数据
+        final updatedTargetDoc = Map<String, dynamic>.from(targetDoc);
+        _setNestedValue(updatedTargetDoc, fieldPath.split('.'), fieldValue);
+        setState(() {
+          targetDocMap[docId] = updatedTargetDoc;
+        });
+      }
+
+      // 更新文档差异状态
+      _updateDocumentDiff(docId);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('复制字段${toSource ? '到源' : '到目标'}失败: $e')),
+      );
+    } finally {
+      setState(() {
+        _isProcessing = false;
+      });
+    }
+  }
+
+  // 复制到源或目标
+  Future<void> _copyToDirection(bool toSource) async {
+    final selectedPath = toSource ? _selectedTargetPath : _selectedSourcePath;
     if (selectedPath == null) return;
 
     final parts = selectedPath.split('.');
@@ -1068,22 +1028,22 @@ class _DocumentTreeComparisonScreenState
 
     // 检查是否为文档级别操作
     if (parts.length == 1) {
-      await _deleteDocument(docId, isSource);
+      await _copyDocument(docId, toSource);
     } else {
-      // 字段级别删除
+      // 字段级别操作
       final fieldPath = parts.sublist(1).join('.');
-      await _deleteField(docId, fieldPath, isSource);
+      await _copyField(docId, fieldPath, toSource);
     }
   }
 
-  // 删除源
-  Future<void> _deleteSource() async {
-    await _deleteFromDirection(true);
+  // 复制到源
+  Future<void> _copyToSource() async {
+    await _copyToDirection(true);
   }
 
-  // 删除目标
-  Future<void> _deleteTarget() async {
-    await _deleteFromDirection(false);
+  // 复制到目标
+  Future<void> _copyToTarget() async {
+    await _copyToDirection(false);
   }
 
   // 删除文档（统一处理源和目标）
@@ -1231,6 +1191,215 @@ class _DocumentTreeComparisonScreenState
     }
   }
 
+  // 删除源或目标
+  Future<void> _deleteFromDirection(bool isSource) async {
+    final selectedPath = isSource ? _selectedSourcePath : _selectedTargetPath;
+    if (selectedPath == null) return;
+
+    final parts = selectedPath.split('.');
+    final docId = parts.first;
+
+    // 检查是否为文档级别操作
+    if (parts.length == 1) {
+      await _deleteDocument(docId, isSource);
+    } else {
+      // 字段级别删除
+      final fieldPath = parts.sublist(1).join('.');
+      await _deleteField(docId, fieldPath, isSource);
+    }
+  }
+
+  // 删除源
+  Future<void> _deleteSource() async {
+    await _deleteFromDirection(true);
+  }
+
+  // 删除目标
+  Future<void> _deleteTarget() async {
+    await _deleteFromDirection(false);
+  }
+
+  /// 从文档中提取ID字段的值
+  String _extractDocumentId(Map<String, dynamic> doc) {
+    return (doc.containsKey(widget.idField))
+        ? doc[widget.idField].toString()
+        : doc['_id'].toString();
+  }
+
+  // 获取文档图标
+  Widget _getDocumentIcon(DocumentDiff diff, bool isSource) {
+    return diff.sourceDocument == null || diff.targetDocument == null
+        ? Icon(Icons.add_circle, color: isSource ? Colors.green : Colors.grey)
+        : diff.fieldDiffs?.isEmpty == true
+        ? const Icon(Icons.check_circle, color: Colors.green)
+        : const Icon(Icons.edit, color: Colors.amber);
+  }
+
+  // 获取文档状态文本
+  String _getDocumentStatusText(DocumentDiff diff, bool isSource) {
+    return diff.sourceDocument == null || diff.targetDocument == null
+        ? (diff.sourceDocument != null
+              ? (isSource ? '仅在源中存在' : '不存在')
+              : (!isSource ? '仅在目标中存在' : '不存在'))
+        : diff.fieldDiffs?.isEmpty == true
+        ? '相同'
+        : '已修改';
+  }
+
+  // 获取字段背景颜色
+  Color _getFieldBackgroundColor(
+    bool isSelected,
+    bool isIgnored,
+    bool hasDiff,
+  ) {
+    if (isSelected) {
+      return Theme.of(context).colorScheme.primaryContainer;
+    }
+    if (hasDiff) {
+      return Colors.amber.withOpacity(0.1);
+    }
+    return Colors.transparent;
+  }
+
+  // 获取字段文本颜色
+  Color _getFieldTextColor(bool isIgnored, bool hasDiff) {
+    if (isIgnored) {
+      return Theme.of(context).colorScheme.outline;
+    }
+    if (hasDiff) {
+      return Theme.of(context).colorScheme.error;
+    }
+    return Theme.of(context).colorScheme.onSurface;
+  }
+
+  // 获取嵌套字段值
+  dynamic _getNestedValue(Map<String, dynamic> doc, List<String> pathParts) {
+    dynamic current = doc;
+
+    for (final part in pathParts) {
+      if (current is! Map) return null;
+
+      if (part.startsWith('[') && part.endsWith(']')) {
+        // 处理数组索引
+        final indexStr = part.substring(1, part.length - 1);
+        final index = int.tryParse(indexStr);
+
+        if (index != null && current is List && index < current.length) {
+          current = current[index];
+        } else {
+          return null;
+        }
+      } else {
+        // 处理对象属性
+        current = current[part];
+      }
+
+      if (current == null) return null;
+    }
+
+    return current;
+  }
+
+  // 检查字段是否有差异
+  bool _hasFieldDiff(DocumentDiff diff, String fieldPath) {
+    if (diff.fieldDiffs == null) return false;
+
+    // 检查完全匹配
+    if (diff.fieldDiffs!.contains(fieldPath)) return true;
+
+    // 检查前缀匹配（对于嵌套字段）
+    final String prefix = '$fieldPath.';
+    for (final path in diff.fieldDiffs!) {
+      if (path.startsWith(prefix)) return true;
+    }
+
+    // 检查数组元素匹配
+    final String arrayPrefix = '$fieldPath[';
+    for (final path in diff.fieldDiffs!) {
+      if (path.startsWith(arrayPrefix)) return true;
+    }
+
+    return false;
+  }
+
+  // 重新比较文档
+
+  // 加载完整文档数据
+  Future<void> _loadDocuments() async {
+    setState(() {
+      _isLoading = true;
+      _sourceDocuments.clear();
+      _targetDocuments.clear();
+    });
+
+    try {
+      // 从源数据库加载全量文档
+      if (widget.sourceConnectionId != null) {
+        try {
+          final sourceDocs = await _mongoService.getDocuments(
+            widget.sourceConnectionId!,
+            widget.sourceDatabaseName,
+            widget.sourceCollection,
+            limit: 0, // 获取所有文档
+          );
+
+          print('从源数据库加载了 ${sourceDocs.length} 个文档');
+
+          // 将文档添加到源文档映射中
+          for (final doc in sourceDocs) {
+            var docId = _extractDocumentId(doc.data);
+            _sourceDocuments[docId] = doc.data;
+          }
+        } catch (e) {
+          print('加载源数据库文档失败: $e');
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('加载源数据库文档失败: $e')));
+        }
+      }
+
+      // 从目标数据库加载全量文档
+      if (widget.targetConnectionId != null) {
+        try {
+          final targetDocs = await _mongoService.getDocuments(
+            widget.targetConnectionId!,
+            widget.targetDatabaseName,
+            widget.targetCollection,
+            limit: 0, // 获取所有文档
+          );
+
+          print('从目标数据库加载了 ${targetDocs.length} 个文档');
+
+          // 将文档添加到目标文档映射中
+          for (final doc in targetDocs) {
+            var docId = _extractDocumentId(doc.data);
+            _targetDocuments[docId] = doc.data;
+          }
+        } catch (e) {
+          print('加载目标数据库文档失败: $e');
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('加载目标数据库文档失败: $e')));
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('加载文档失败: $e')));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  // 从数据库重新加载数据
+  Future<void> _reloadFromDatabase() async {
+    await _loadDocuments();
+  }
+
   // 删除嵌套字段
   void _removeNestedField(Map<String, dynamic> doc, List<String> pathParts) {
     if (pathParts.isEmpty) return;
@@ -1286,216 +1455,6 @@ class _DocumentTreeComparisonScreenState
     }
   }
 
-  // 复制文档（统一处理源和目标）
-  Future<void> _copyDocument(String docId, bool toSource) async {
-    final String? connectionId = toSource
-        ? widget.sourceConnectionId
-        : widget.targetConnectionId;
-    if (connectionId == null) return;
-
-    // 获取源文档和目标文档
-    final sourceDoc = toSource
-        ? _targetDocuments[docId]
-        : _sourceDocuments[docId];
-    final targetMap = toSource ? _sourceDocuments : _targetDocuments;
-
-    if (sourceDoc == null) return;
-
-    setState(() {
-      _isProcessing = true;
-      _processingMessage = '正在复制文档${toSource ? '到源' : '到目标'}...';
-    });
-
-    try {
-      // 检查目标文档是否已存在
-      final targetDoc = targetMap[docId];
-      if (targetDoc != null) {
-        // 文档已存在，使用更新
-        final objectId = _convertToObjectId(docId);
-        final docToUpdate = Map<String, dynamic>.from(sourceDoc);
-        docToUpdate.remove('_id'); // 移除_id字段，避免更新错误
-        await _mongoService.updateDocument(
-          connectionId,
-          toSource ? widget.sourceDatabaseName : widget.targetDatabaseName,
-          toSource ? widget.sourceCollection : widget.targetCollection,
-          objectId,
-          docToUpdate,
-        );
-      } else {
-        // 文档不存在，使用插入
-        await _mongoService.insertDocument(
-          connectionId,
-          toSource ? widget.sourceDatabaseName : widget.targetDatabaseName,
-          toSource ? widget.sourceCollection : widget.targetCollection,
-          sourceDoc,
-        );
-      }
-
-      // 更新本地数据
-      setState(() {
-        targetMap[docId] = Map<String, dynamic>.from(sourceDoc);
-      });
-
-      // 更新文档差异状态
-      _updateDocumentDiff(docId);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('复制文档${toSource ? '到源' : '到目标'}失败: $e')),
-      );
-    } finally {
-      setState(() {
-        _isProcessing = false;
-      });
-    }
-  }
-
-  // 复制字段（统一处理源和目标）
-  Future<void> _copyField(String docId, String fieldPath, bool toSource) async {
-    final String? connectionId = toSource
-        ? widget.sourceConnectionId
-        : widget.targetConnectionId;
-    if (connectionId == null) return;
-
-    // 获取源文档和目标文档
-    final sourceDocMap = toSource ? _targetDocuments : _sourceDocuments;
-    final targetDocMap = toSource ? _sourceDocuments : _targetDocuments;
-
-    final sourceDoc = sourceDocMap[docId];
-    if (sourceDoc == null) return;
-
-    setState(() {
-      _isProcessing = true;
-      _processingMessage = '正在复制字段${toSource ? '到源' : '到目标'}...';
-    });
-
-    try {
-      // 从源文档中获取字段值
-      final fieldValue = _getNestedValue(sourceDoc, fieldPath.split('.'));
-
-      // 检查目标文档是否存在
-      final targetDoc = targetDocMap[docId];
-      final objectId = _convertToObjectId(docId);
-
-      if (targetDoc == null) {
-        // 目标文档不存在，需要先创建一个空文档
-        // 创建一个只包含_id和要复制字段的新文档
-        final Map<String, dynamic> newDoc = {'_id': objectId};
-        _setNestedValue(newDoc, fieldPath.split('.'), fieldValue);
-
-        // 插入新文档
-        await _mongoService.insertDocument(
-          connectionId,
-          toSource ? widget.sourceDatabaseName : widget.targetDatabaseName,
-          toSource ? widget.sourceCollection : widget.targetCollection,
-          newDoc,
-        );
-
-        // 更新本地数据
-        setState(() {
-          targetDocMap[docId] = newDoc;
-        });
-      } else {
-        // 目标文档存在，使用updateField更新字段
-        await _mongoService.updateField(
-          connectionId,
-          toSource ? widget.sourceDatabaseName : widget.targetDatabaseName,
-          toSource ? widget.sourceCollection : widget.targetCollection,
-          objectId,
-          fieldPath,
-          fieldValue,
-        );
-
-        // 更新本地数据
-        final updatedTargetDoc = Map<String, dynamic>.from(targetDoc);
-        _setNestedValue(updatedTargetDoc, fieldPath.split('.'), fieldValue);
-        setState(() {
-          targetDocMap[docId] = updatedTargetDoc;
-        });
-      }
-
-      // 更新文档差异状态
-      _updateDocumentDiff(docId);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('复制字段${toSource ? '到源' : '到目标'}失败: $e')),
-      );
-    } finally {
-      setState(() {
-        _isProcessing = false;
-      });
-    }
-  }
-
-  // 更新文档差异状态
-  void _updateDocumentDiff(String docId) {
-    // 获取源文档和目标文档
-    final sourceDoc = _sourceDocuments[docId];
-    final targetDoc = _targetDocuments[docId];
-
-    // 如果两边都有文档，重新比较差异
-    if (sourceDoc != null && targetDoc != null) {
-      // 查找现有的差异记录
-      int index = _diffResults.indexWhere((diff) => diff.id == docId);
-
-      // 重新计算字段差异
-      final fieldDiffs = <String>[];
-      _compareDocument(sourceDoc, targetDoc, '', fieldDiffs);
-
-      // 更新差异记录
-      if (index >= 0) {
-        // 更新现有记录
-        setState(() {
-          _diffResults[index] = DocumentDiff(
-            id: docId,
-            sourceDocument: sourceDoc,
-            targetDocument: targetDoc,
-            fieldDiffs: fieldDiffs,
-          );
-        });
-      } else {
-        // 添加新记录
-        setState(() {
-          _diffResults.add(
-            DocumentDiff(
-              id: docId,
-              sourceDocument: sourceDoc,
-              targetDocument: targetDoc,
-              fieldDiffs: fieldDiffs,
-            ),
-          );
-        });
-      }
-    }
-  }
-
-  // 获取嵌套字段值
-  dynamic _getNestedValue(Map<String, dynamic> doc, List<String> pathParts) {
-    dynamic current = doc;
-
-    for (final part in pathParts) {
-      if (current is! Map) return null;
-
-      if (part.startsWith('[') && part.endsWith(']')) {
-        // 处理数组索引
-        final indexStr = part.substring(1, part.length - 1);
-        final index = int.tryParse(indexStr);
-
-        if (index != null && current is List && index < current.length) {
-          current = current[index];
-        } else {
-          return null;
-        }
-      } else {
-        // 处理对象属性
-        current = current[part];
-      }
-
-      if (current == null) return null;
-    }
-
-    return current;
-  }
-
   // 设置嵌套字段值
   void _setNestedValue(
     Map<String, dynamic> doc,
@@ -1543,6 +1502,48 @@ class _DocumentTreeComparisonScreenState
     } else {
       // 处理对象属性
       parent[lastPart] = value;
+    }
+  }
+
+  // 更新文档差异状态
+  void _updateDocumentDiff(String docId) {
+    // 获取源文档和目标文档
+    final sourceDoc = _sourceDocuments[docId];
+    final targetDoc = _targetDocuments[docId];
+
+    // 如果两边都有文档，重新比较差异
+    if (sourceDoc != null && targetDoc != null) {
+      // 查找现有的差异记录
+      int index = _diffResults.indexWhere((diff) => diff.id == docId);
+
+      // 重新计算字段差异
+      final fieldDiffs = <String>[];
+      _compareDocument(sourceDoc, targetDoc, '', fieldDiffs);
+
+      // 更新差异记录
+      if (index >= 0) {
+        // 更新现有记录
+        setState(() {
+          _diffResults[index] = DocumentDiff(
+            id: docId,
+            sourceDocument: sourceDoc,
+            targetDocument: targetDoc,
+            fieldDiffs: fieldDiffs,
+          );
+        });
+      } else {
+        // 添加新记录
+        setState(() {
+          _diffResults.add(
+            DocumentDiff(
+              id: docId,
+              sourceDocument: sourceDoc,
+              targetDocument: targetDoc,
+              fieldDiffs: fieldDiffs,
+            ),
+          );
+        });
+      }
     }
   }
 }
