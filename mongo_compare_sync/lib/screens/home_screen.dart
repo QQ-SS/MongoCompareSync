@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../screens/connection_screen.dart';
 import '../screens/compare_screen.dart';
 import '../screens/settings_screen.dart';
-import '../screens/rule_list_screen.dart';
 import '../widgets/responsive_layout.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -20,7 +19,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final List<Widget> _pages = [
     const ConnectionScreen(),
     const CompareScreen(),
-    const RuleListScreen(),
     const SettingsScreen(),
   ];
 
@@ -31,7 +29,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       icon: Icon(Icons.compare_arrows),
       label: '比较同步',
     ),
-    const BottomNavigationBarItem(icon: Icon(Icons.rule), label: '比较规则'),
     const BottomNavigationBarItem(icon: Icon(Icons.settings), label: '设置'),
   ];
 
@@ -58,10 +55,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           NavigationRailDestination(
             icon: const Icon(Icons.compare_arrows),
             label: const Text('比较同步'),
-          ),
-          NavigationRailDestination(
-            icon: const Icon(Icons.rule),
-            label: const Text('比较规则'),
           ),
           NavigationRailDestination(
             icon: const Icon(Icons.settings),

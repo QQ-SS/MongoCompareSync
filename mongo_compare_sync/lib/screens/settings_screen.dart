@@ -9,10 +9,6 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
-    final pageSize = ref.watch(pageSizeProvider);
-    final showObjectIds = ref.watch(showObjectIdsProvider);
-    final caseSensitiveComparison = ref.watch(caseSensitiveComparisonProvider);
-    final confirmBeforeSync = ref.watch(confirmBeforeSyncProvider);
     final enableLogging = ref.watch(enableLoggingProvider);
 
     return Scaffold(
@@ -64,110 +60,6 @@ class SettingsScreen extends ConsumerWidget {
                         ),
                       ],
                     ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // 数据显示设置
-          Card(
-            elevation: 2,
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    '数据显示',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
-                  ListTile(
-                    title: const Text('每页显示文档数量'),
-                    subtitle: Text('$pageSize'),
-                    trailing: DropdownButton<int>(
-                      value: pageSize,
-                      onChanged: (value) {
-                        if (value != null) {
-                          ref.read(pageSizeProvider.notifier).state = value;
-                        }
-                      },
-                      items: const [
-                        DropdownMenuItem(value: 10, child: Text('10')),
-                        DropdownMenuItem(value: 20, child: Text('20')),
-                        DropdownMenuItem(value: 50, child: Text('50')),
-                        DropdownMenuItem(value: 100, child: Text('100')),
-                      ],
-                    ),
-                  ),
-                  SwitchListTile(
-                    title: const Text('显示ObjectId'),
-                    subtitle: const Text('在文档列表中显示MongoDB的ObjectId'),
-                    value: showObjectIds,
-                    onChanged: (value) {
-                      ref.read(showObjectIdsProvider.notifier).state = value;
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // 比较设置
-          Card(
-            elevation: 2,
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    '比较设置',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
-                  SwitchListTile(
-                    title: const Text('区分大小写比较'),
-                    subtitle: const Text('比较字符串时是否区分大小写'),
-                    value: caseSensitiveComparison,
-                    onChanged: (value) {
-                      ref.read(caseSensitiveComparisonProvider.notifier).state =
-                          value;
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // 同步设置
-          Card(
-            elevation: 2,
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    '同步设置',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
-                  SwitchListTile(
-                    title: const Text('同步前确认'),
-                    subtitle: const Text('在执行同步操作前显示确认对话框'),
-                    value: confirmBeforeSync,
-                    onChanged: (value) {
-                      ref.read(confirmBeforeSyncProvider.notifier).state =
-                          value;
-                    },
                   ),
                 ],
               ),
