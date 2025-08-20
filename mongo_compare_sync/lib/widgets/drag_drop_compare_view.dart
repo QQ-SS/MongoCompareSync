@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/comparison_task.dart';
 import '../models/connection.dart';
-import '../models/collection_binding.dart';
 import '../widgets/database_collection_panel.dart';
 import '../widgets/binding_list_button.dart';
 import '../providers/connection_provider.dart';
@@ -16,7 +16,7 @@ class DragDropCompareView extends ConsumerStatefulWidget {
 
 class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
     with TickerProviderStateMixin {
-  final List<CollectionBinding> _bindings = [];
+  final List<BindingConfig> _bindings = [];
   final GlobalKey<DatabaseCollectionPanelState> _sourceKey = GlobalKey();
   final GlobalKey<DatabaseCollectionPanelState> _targetKey = GlobalKey();
   final GlobalKey _painterKey = GlobalKey();
@@ -191,16 +191,18 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
   }
 
   void _createBinding(
-    String targetDatabase,
+    String targetDatabaseName,
     String targetCollection,
     Map<String, String> sourceData,
   ) {
-    final binding = CollectionBinding(
-      sourceDatabase: sourceData['database']!,
+    final binding = BindingConfig(
+      id: '${sourceData['database']}_${sourceData['collection']}_${targetDatabaseName}_$targetCollection',
+      sourceDatabaseName: sourceData['database']!,
       sourceCollection: sourceData['collection']!,
-      targetDatabase: targetDatabase,
+      targetDatabaseName: targetDatabaseName,
       targetCollection: targetCollection,
-      id: '${sourceData['database']}_${sourceData['collection']}_${targetDatabase}_$targetCollection',
+      idField: '_id', // 默认使用_id作为ID字段
+      ignoredFields: [], // 默认为空，可以在比较界面中设置
     );
     if (!_bindings.contains(binding)) {
       setState(() {
@@ -209,7 +211,7 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
     }
   }
 
-  void _removeBinding(CollectionBinding binding) {
+  void _removeBinding(BindingConfig binding) {
     setState(() {
       _bindings.remove(binding);
     });
@@ -222,7 +224,7 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
   }
 
   // 滚动单个绑定到可见区域
-  void _scrollBindingToVisible(CollectionBinding binding) {
+  void _scrollBindingToVisible(BindingConfig binding) {
     // 确保源面板和目标面板的状态都存在
     final sourceState = _sourceKey.currentState;
     final targetState = _targetKey.currentState;
@@ -230,16 +232,16 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
     if (sourceState == null || targetState == null) return;
 
     // 展开源数据库并滚动到源集合
-    sourceState.expandDatabase(binding.sourceDatabase);
+    sourceState.expandDatabase(binding.sourceDatabaseName);
     sourceState.scrollToCollection(
-      binding.sourceDatabase,
+      binding.sourceDatabaseName,
       binding.sourceCollection,
     );
 
     // 展开目标数据库并滚动到目标集合
-    targetState.expandDatabase(binding.targetDatabase);
+    targetState.expandDatabase(binding.targetDatabaseName);
     targetState.scrollToCollection(
-      binding.targetDatabase,
+      binding.targetDatabaseName,
       binding.targetCollection,
     );
   }
@@ -247,7 +249,7 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
   bool _isSourceBound(String database, String collection) {
     return _bindings.any(
       (binding) =>
-          binding.sourceDatabase == database &&
+          binding.sourceDatabaseName == database &&
           binding.sourceCollection == collection,
     );
   }
@@ -255,13 +257,13 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
   bool _isTargetBound(String database, String collection) {
     return _bindings.any(
       (binding) =>
-          binding.targetDatabase == database &&
+          binding.targetDatabaseName == database &&
           binding.targetCollection == collection,
     );
   }
 
   // 添加绑定
-  void _addBinding(CollectionBinding binding) {
+  void _addBinding(BindingConfig binding) {
     if (!_bindings.contains(binding)) {
       setState(() {
         _bindings.add(binding);
@@ -301,7 +303,7 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
 }
 
 class ConnectionLinePainter extends CustomPainter {
-  final List<CollectionBinding> bindings;
+  final List<BindingConfig> bindings;
   final GlobalKey<DatabaseCollectionPanelState> sourceKey;
   final GlobalKey<DatabaseCollectionPanelState> targetKey;
   final BuildContext context;
@@ -331,32 +333,36 @@ class ConnectionLinePainter extends CustomPainter {
 
     for (final binding in bindings) {
       print(
-        'ConnectionLinePainter: 处理绑定 ${binding.sourceDatabase}.${binding.sourceCollection} -> ${binding.targetDatabase}.${binding.targetCollection}',
+        'ConnectionLinePainter: 处理绑定 ${binding.sourceDatabaseName}.${binding.sourceCollection} -> ${binding.targetDatabaseName}.${binding.targetCollection}',
       );
 
       // 修改key的格式，使用 数据库名.集合名 作为key
       final sourceCollectionKey =
-          '${binding.sourceDatabase}.${binding.sourceCollection}';
+          '${binding.sourceDatabaseName}.${binding.sourceCollection}';
       final targetCollectionKey =
-          '${binding.targetDatabase}.${binding.targetCollection}';
+          '${binding.targetDatabaseName}.${binding.targetCollection}';
 
       final isSourceDatabaseCollapsed =
-          sourceKey.currentState?.isDatabaseCollapsed(binding.sourceDatabase) ??
+          sourceKey.currentState?.isDatabaseCollapsed(
+            binding.sourceDatabaseName,
+          ) ??
           true;
       final isTargetDatabaseCollapsed =
-          targetKey.currentState?.isDatabaseCollapsed(binding.targetDatabase) ??
+          targetKey.currentState?.isDatabaseCollapsed(
+            binding.targetDatabaseName,
+          ) ??
           true;
 
       // 获取ValueKey对应的BuildContext
       final sourceContext = _findContextForKey(
         sourceKey.currentState?.nodeKeys[isSourceDatabaseCollapsed
-            ? binding.sourceDatabase
+            ? binding.sourceDatabaseName
             : sourceCollectionKey],
         PanelType.source,
       );
       final targetContext = _findContextForKey(
         targetKey.currentState?.nodeKeys[isTargetDatabaseCollapsed
-            ? binding.targetDatabase
+            ? binding.targetDatabaseName
             : targetCollectionKey],
         PanelType.target,
       );

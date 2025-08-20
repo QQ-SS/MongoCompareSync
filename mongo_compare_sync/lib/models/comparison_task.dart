@@ -1,4 +1,5 @@
 class BindingConfig {
+  final String id;
   final String sourceCollection;
   final String targetCollection;
   final String sourceDatabaseName;
@@ -7,6 +8,7 @@ class BindingConfig {
   final List<String> ignoredFields;
 
   BindingConfig({
+    required this.id,
     required this.sourceCollection,
     required this.targetCollection,
     required this.sourceDatabaseName,
@@ -18,6 +20,7 @@ class BindingConfig {
   // 从JSON反序列化
   factory BindingConfig.fromJson(Map<String, dynamic> json) {
     return BindingConfig(
+      id: json['id'] as String,
       sourceCollection: json['sourceCollection'] as String,
       targetCollection: json['targetCollection'] as String,
       sourceDatabaseName: json['sourceDatabaseName'] as String,
@@ -34,6 +37,7 @@ class BindingConfig {
   // 序列化为JSON
   Map<String, dynamic> toJson() {
     return {
+      'id': id,
       'sourceCollection': sourceCollection,
       'targetCollection': targetCollection,
       'sourceDatabaseName': sourceDatabaseName,
@@ -56,35 +60,6 @@ class ComparisonTask {
     this.sourceConnectionId,
     this.targetConnectionId,
   });
-
-  // 从单个绑定创建任务
-  factory ComparisonTask.fromSingleBinding({
-    required String name,
-    required String sourceCollection,
-    required String targetCollection,
-    required String sourceDatabaseName,
-    required String targetDatabaseName,
-    String? sourceConnectionId,
-    String? targetConnectionId,
-    String? idField,
-    List<String>? ignoredFields,
-  }) {
-    return ComparisonTask(
-      name: name,
-      bindings: [
-        BindingConfig(
-          sourceCollection: sourceCollection,
-          targetCollection: targetCollection,
-          sourceDatabaseName: sourceDatabaseName,
-          targetDatabaseName: targetDatabaseName,
-          idField: idField,
-          ignoredFields: ignoredFields ?? [],
-        ),
-      ],
-      sourceConnectionId: sourceConnectionId,
-      targetConnectionId: targetConnectionId,
-    );
-  }
 
   // 从JSON反序列化
   factory ComparisonTask.fromJson(Map<String, dynamic> json) {

@@ -1,19 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/collection_binding.dart';
 import '../models/comparison_task.dart';
 import '../models/connection.dart';
 import '../repositories/comparison_task_repository.dart';
 import '../screens/document_tree_comparison_screen.dart';
 
 class BindingListButton extends ConsumerStatefulWidget {
-  final List<CollectionBinding> bindings;
+  final List<BindingConfig> bindings;
   final MongoConnection? sourceConnection;
   final MongoConnection? targetConnection;
-  final Function(CollectionBinding) onRemoveBinding;
-  final Function(CollectionBinding) onScrollToBinding;
+  final Function(BindingConfig) onRemoveBinding;
+  final Function(BindingConfig) onScrollToBinding;
   final Function() onClearAllBindings;
-  final Function(CollectionBinding)? onAddBinding; // 新增：添加绑定的回调
+  final Function(BindingConfig)? onAddBinding; // 新增：添加绑定的回调
   final Function(String?, String?)? onConnectionChange; // 新增：更改连接的回调
 
   const BindingListButton({
@@ -151,11 +150,11 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
                       color: Theme.of(context).colorScheme.primary,
                     ),
                     title: Text(
-                      '${binding.sourceDatabase}.${binding.sourceCollection}',
+                      '${binding.sourceDatabaseName}.${binding.sourceCollection}',
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     subtitle: Text(
-                      '→ ${binding.targetDatabase}.${binding.targetCollection}',
+                      '→ ${binding.targetDatabaseName}.${binding.targetCollection}',
                     ),
                     onTap: () => widget.onScrollToBinding(binding),
                     trailing: Row(
@@ -238,10 +237,11 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
     final bindingConfigs = widget.bindings
         .map(
           (binding) => BindingConfig(
+            id: binding.id,
             sourceCollection: binding.sourceCollection,
             targetCollection: binding.targetCollection,
-            sourceDatabaseName: binding.sourceDatabase,
-            targetDatabaseName: binding.targetDatabase,
+            sourceDatabaseName: binding.sourceDatabaseName,
+            targetDatabaseName: binding.targetDatabaseName,
             idField: '_id', // 默认使用_id作为ID字段
             ignoredFields: [], // 默认为空，可以在比较界面中设置
           ),
@@ -436,12 +436,14 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
 
     // 将任务中的所有绑定添加到绑定列表
     for (final bindingConfig in task.bindings) {
-      final binding = CollectionBinding(
-        id: '${DateTime.now().millisecondsSinceEpoch}_${bindingConfig.sourceCollection}_${bindingConfig.targetCollection}',
+      final binding = BindingConfig(
+        id: '${bindingConfig.sourceDatabaseName}_${bindingConfig.sourceCollection}_${bindingConfig.targetDatabaseName}_${bindingConfig.targetCollection}',
         sourceCollection: bindingConfig.sourceCollection,
         targetCollection: bindingConfig.targetCollection,
-        sourceDatabase: bindingConfig.sourceDatabaseName,
-        targetDatabase: bindingConfig.targetDatabaseName,
+        sourceDatabaseName: bindingConfig.sourceDatabaseName,
+        targetDatabaseName: bindingConfig.targetDatabaseName,
+        idField: bindingConfig.idField,
+        ignoredFields: bindingConfig.ignoredFields,
       );
 
       // 如果提供了添加绑定的回调，使用它来添加绑定
@@ -484,18 +486,19 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
   Future<void> onCompareAllBindings() async {}
 
   // 导航到比较结果页面
-  Future<void> onNavigateToComparison(CollectionBinding binding) async {
+  Future<void> onNavigateToComparison(BindingConfig binding) async {
     // 导航到比较结果页面 - 使用新的文档树比较界面
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => DocumentTreeComparisonScreen(
           sourceCollection: binding.sourceCollection,
           targetCollection: binding.targetCollection,
-          sourceDatabaseName: binding.sourceDatabase,
-          targetDatabaseName: binding.targetDatabase,
+          sourceDatabaseName: binding.sourceDatabaseName,
+          targetDatabaseName: binding.targetDatabaseName,
           sourceConnectionId: widget.sourceConnection?.id,
           targetConnectionId: widget.targetConnection?.id,
-          ignoredFields: [], // 可以从设置中获取忽略字段
+          idField: binding.idField,
+          ignoredFields: binding.ignoredFields,
         ),
       ),
     );
