@@ -243,6 +243,36 @@ class _DocumentTreeComparisonScreenState
           fieldPath,
           fieldDiffs,
         );
+      } else if (sourceValue is List && targetValue is List) {
+        // 比较数组
+        if (sourceValue.length != targetValue.length) {
+          // 数组长度不同，添加差异字段路径
+          if (!fieldDiffs.contains(fieldPath)) {
+            fieldDiffs.add(fieldPath);
+          }
+        } else {
+          // 数组长度相同，逐个比较元素
+          for (int i = 0; i < sourceValue.length; i++) {
+            final sourceItem = sourceValue[i];
+            final targetItem = targetValue[i];
+
+            if (sourceItem is Map && targetItem is Map) {
+              // 递归比较嵌套对象
+              _compareDocument(
+                Map<String, dynamic>.from(sourceItem),
+                Map<String, dynamic>.from(targetItem),
+                '$fieldPath[$i]',
+                fieldDiffs,
+              );
+            } else if (sourceItem != targetItem) {
+              // 值不同，添加差异字段路径
+              final itemPath = '$fieldPath[$i]';
+              if (!fieldDiffs.contains(itemPath)) {
+                fieldDiffs.add(itemPath);
+              }
+            }
+          }
+        }
       } else if (sourceValue != targetValue) {
         // 值不同，添加差异字段路径
         if (!fieldDiffs.contains(fieldPath)) {
