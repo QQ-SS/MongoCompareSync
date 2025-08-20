@@ -475,20 +475,15 @@ class _DocumentTreeComparisonScreenState
             final docId = parentPath.split('.').first;
             _scrollToMatchingDocument(docId, isSource);
           },
-          onSecondaryTap: () {
-            // 显示上下文菜单
-            final RenderBox button = context.findRenderObject() as RenderBox;
+          onSecondaryTapDown: (details) {
+            // 显示上下文菜单，使用点击位置
             final RenderBox overlay =
                 Overlay.of(context).context.findRenderObject() as RenderBox;
-            final RelativeRect position = RelativeRect.fromRect(
-              Rect.fromPoints(
-                button.localToGlobal(Offset.zero, ancestor: overlay),
-                button.localToGlobal(
-                  button.size.bottomRight(Offset.zero),
-                  ancestor: overlay,
-                ),
-              ),
-              Offset.zero & overlay.size,
+            final RelativeRect position = RelativeRect.fromLTRB(
+              details.globalPosition.dx,
+              details.globalPosition.dy,
+              details.globalPosition.dx + 1,
+              details.globalPosition.dy + 1,
             );
 
             showMenu(
