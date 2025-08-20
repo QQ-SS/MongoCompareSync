@@ -48,6 +48,9 @@ class _DocumentTreeComparisonScreenState
   // 存储选中的节点路径
   String? _selectedSourcePath;
   String? _selectedTargetPath;
+  // 滚动控制器
+  final ScrollController _sourceScrollController = ScrollController();
+  final ScrollController _targetScrollController = ScrollController();
   // 加载状态
   bool _isLoading = true;
 
@@ -352,6 +355,9 @@ class _DocumentTreeComparisonScreenState
                   _selectedSourcePath = null;
                 }
               });
+
+              // 查找对应文档在另一侧的索引位置
+              _scrollToMatchingDocument(docId, isSource);
             },
           ),
 
@@ -398,6 +404,9 @@ class _DocumentTreeComparisonScreenState
         // 文档列表
         Expanded(
           child: ListView.builder(
+            controller: isSource
+                ? _sourceScrollController
+                : _targetScrollController,
             itemCount: diffs.length,
             itemBuilder: (context, index) {
               final diff = diffs[index];
@@ -473,6 +482,10 @@ class _DocumentTreeComparisonScreenState
                 _selectedSourcePath = null;
               }
             });
+
+            // 提取文档ID并滚动到匹配文档
+            final docId = parentPath.split('.').first;
+            _scrollToMatchingDocument(docId, isSource);
           },
           child: Container(
             color: _getFieldBackgroundColor(
@@ -1331,6 +1344,35 @@ class _DocumentTreeComparisonScreenState
     } else {
       // 处理对象属性
       parent[lastPart] = value;
+    }
+  }
+
+  // 滚动到匹配的文档
+  void _scrollToMatchingDocument(String docId, bool isSource) {
+    // 查找文档在列表中的索引
+    final index = _diffResults.indexWhere((diff) => diff.id == docId);
+    if (index < 0) return;
+
+    // 计算滚动位置
+    // 获取每个项目的平均高度（这里假设为120，可以根据实际情况调整）
+    const double estimatedItemHeight = 120.0;
+    final double scrollOffset = index * estimatedItemHeight;
+
+    // 滚动到对应位置
+    if (isSource) {
+      // 如果点击的是源文档，滚动目标文档列表
+      _targetScrollController.animateTo(
+        scrollOffset,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    } else {
+      // 如果点击的是目标文档，滚动源文档列表
+      _sourceScrollController.animateTo(
+        scrollOffset,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
     }
   }
 
