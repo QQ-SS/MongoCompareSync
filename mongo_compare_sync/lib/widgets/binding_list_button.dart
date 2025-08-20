@@ -35,7 +35,6 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
   bool _showBindingsList = false;
   final ComparisonTaskRepository _taskRepository = ComparisonTaskRepository();
   List<ComparisonTask>? _savedTasks;
-  bool _isLoadingTasks = false;
   String? _currentTaskName; // 添加当前任务名变量
 
   @override
@@ -248,8 +247,8 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
             targetCollection: binding.targetCollection,
             sourceDatabaseName: binding.sourceDatabaseName,
             targetDatabaseName: binding.targetDatabaseName,
-            idField: '_id', // 默认使用_id作为ID字段
-            ignoredFields: [], // 默认为空，可以在比较界面中设置
+            idField: binding.idField ?? '_id', // 默认使用_id作为ID字段
+            ignoredFields: binding.ignoredFields ?? [], // 默认为空，可以在比较界面中设置
           ),
         )
         .toList();
@@ -272,16 +271,8 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
 
   // 显示加载任务对话框
   Future<void> _showLoadTaskDialog() async {
-    setState(() {
-      _isLoadingTasks = true;
-    });
-
     // 加载所有保存的任务
     _savedTasks = await _taskRepository.getAllTasks();
-
-    setState(() {
-      _isLoadingTasks = false;
-    });
 
     if (_savedTasks == null || _savedTasks!.isEmpty) {
       ScaffoldMessenger.of(
@@ -510,6 +501,27 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
           targetConnectionId: widget.targetConnection?.id,
           idField: binding.idField,
           ignoredFields: binding.ignoredFields,
+          onIgnoredFieldsChanged: (updatedIgnoredFields) {
+            // 更新绑定中的忽略字段列表
+            final index = widget.bindings.indexOf(binding);
+            if (index >= 0) {
+              // 创建一个新的绑定对象，因为BindingConfig是不可变的
+              final updatedBinding = BindingConfig(
+                id: binding.id,
+                sourceCollection: binding.sourceCollection,
+                targetCollection: binding.targetCollection,
+                sourceDatabaseName: binding.sourceDatabaseName,
+                targetDatabaseName: binding.targetDatabaseName,
+                idField: binding.idField,
+                ignoredFields: updatedIgnoredFields,
+              );
+
+              // 替换原有的绑定
+              setState(() {
+                widget.bindings[index] = updatedBinding;
+              });
+            }
+          },
         ),
       ),
     );

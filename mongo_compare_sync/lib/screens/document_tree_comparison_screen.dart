@@ -15,6 +15,7 @@ class DocumentTreeComparisonScreen extends ConsumerStatefulWidget {
   final String? targetConnectionId;
   final String? idField;
   final List<String> ignoredFields;
+  final Function(List<String>)? onIgnoredFieldsChanged; // 添加回调函数
 
   const DocumentTreeComparisonScreen({
     super.key,
@@ -26,6 +27,7 @@ class DocumentTreeComparisonScreen extends ConsumerStatefulWidget {
     this.targetConnectionId,
     this.idField = '_id',
     this.ignoredFields = const [],
+    this.onIgnoredFieldsChanged, // 初始化回调函数
   });
 
   @override
@@ -244,6 +246,12 @@ class _DocumentTreeComparisonScreenState
                               setState(() {
                                 _ignoredFields.remove(field);
                                 _compareDocuments();
+                                // 通知父组件忽略字段已更改
+                                if (widget.onIgnoredFieldsChanged != null) {
+                                  widget.onIgnoredFieldsChanged!(
+                                    _ignoredFields,
+                                  );
+                                }
                               });
                             },
                             materialTapTargetSize:
@@ -557,6 +565,10 @@ class _DocumentTreeComparisonScreenState
                     _ignoredFields.add(key);
                     // 重新比较文档
                     _compareDocuments();
+                    // 通知父组件忽略字段已更改
+                    if (widget.onIgnoredFieldsChanged != null) {
+                      widget.onIgnoredFieldsChanged!(_ignoredFields);
+                    }
                   });
                 }
               } else if (value == 'unignore') {
@@ -566,6 +578,10 @@ class _DocumentTreeComparisonScreenState
                     _ignoredFields.remove(key);
                     // 重新比较文档
                     _compareDocuments();
+                    // 通知父组件忽略字段已更改
+                    if (widget.onIgnoredFieldsChanged != null) {
+                      widget.onIgnoredFieldsChanged!(_ignoredFields);
+                    }
                   });
                 }
               }
