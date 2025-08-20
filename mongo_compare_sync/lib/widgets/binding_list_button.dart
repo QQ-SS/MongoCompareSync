@@ -230,16 +230,22 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
   Future<void> _saveTask(String name) async {
     if (widget.bindings.isEmpty) return;
 
-    // 获取当前选中的绑定
-    final binding = widget.bindings.first;
+    // 将所有绑定转换为BindingConfig列表
+    final bindingConfigs = widget.bindings
+        .map(
+          (binding) => BindingConfig(
+            sourceCollection: binding.sourceCollection,
+            targetCollection: binding.targetCollection,
+            sourceDatabaseName: binding.sourceDatabase,
+            targetDatabaseName: binding.targetDatabase,
+          ),
+        )
+        .toList();
 
     // 创建任务
     final task = ComparisonTask(
       name: name,
-      sourceCollection: binding.sourceCollection,
-      targetCollection: binding.targetCollection,
-      sourceDatabaseName: binding.sourceDatabase,
-      targetDatabaseName: binding.targetDatabase,
+      bindings: bindingConfigs,
       sourceConnectionId: widget.sourceConnection?.id,
       targetConnectionId: widget.targetConnection?.id,
       ignoredFields: [], // 默认为空，可以在比较界面中设置
@@ -248,9 +254,9 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
     // 保存任务
     await _taskRepository.saveTask(task);
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('任务 "$name" 已保存')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('任务 "$name" 已保存，包含 ${bindingConfigs.length} 个绑定')),
+    );
   }
 
   // 显示加载任务对话框
@@ -323,14 +329,69 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
 
   // 加载任务
   void _loadTask(ComparisonTask task) {
-    // 导航到比较结果页面
+    if (task.bindings.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('任务中没有绑定信息')));
+      return;
+    }
+
+    // 如果任务包含多个绑定，显示选择对话框
+    if (task.bindings.length > 1) {
+      _showBindingSelectionDialog(task);
+    } else {
+      // 只有一个绑定，直接导航到比较结果页面
+      _navigateToComparisonScreen(task, task.bindings.first);
+    }
+  }
+
+  // 显示绑定选择对话框
+  void _showBindingSelectionDialog(ComparisonTask task) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('选择要比较的绑定 - ${task.name}'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: task.bindings.length,
+            itemBuilder: (context, index) {
+              final binding = task.bindings[index];
+              return ListTile(
+                title: Text(
+                  '${binding.sourceDatabaseName}.${binding.sourceCollection}',
+                ),
+                subtitle: Text(
+                  '→ ${binding.targetDatabaseName}.${binding.targetCollection}',
+                ),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _navigateToComparisonScreen(task, binding);
+                },
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('取消'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 导航到比较结果页面
+  void _navigateToComparisonScreen(ComparisonTask task, BindingConfig binding) {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => DocumentTreeComparisonScreen(
-          sourceCollection: task.sourceCollection,
-          targetCollection: task.targetCollection,
-          sourceDatabaseName: task.sourceDatabaseName,
-          targetDatabaseName: task.targetDatabaseName,
+          sourceCollection: binding.sourceCollection,
+          targetCollection: binding.targetCollection,
+          sourceDatabaseName: binding.sourceDatabaseName,
+          targetDatabaseName: binding.targetDatabaseName,
           sourceConnectionId: task.sourceConnectionId,
           targetConnectionId: task.targetConnectionId,
           idField: task.idField,
