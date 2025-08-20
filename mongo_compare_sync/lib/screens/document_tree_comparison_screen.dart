@@ -662,12 +662,11 @@ class _DocumentTreeComparisonScreenState
         nestedData = Map<String, dynamic>.from(value);
       } else if (value is List) {
         valueText = '[${value.length}]';
-        if (value.isNotEmpty && value.first is Map) {
-          isExpandable = true;
-          nestedData = {};
-          for (int i = 0; i < value.length; i++) {
-            nestedData['[$i]'] = value[i];
-          }
+        // 所有数组都可以展开，不仅仅是包含Map的数组
+        isExpandable = true;
+        nestedData = {};
+        for (int i = 0; i < value.length; i++) {
+          nestedData['[$i]'] = value[i];
         }
       } else {
         valueText = value.toString();
@@ -816,12 +815,11 @@ class _DocumentTreeComparisonScreenState
         nestedData = Map<String, dynamic>.from(value);
       } else if (value is List) {
         valueText = '[${value.length}]';
-        if (value.isNotEmpty && value.first is Map) {
-          isExpandable = true;
-          nestedData = {};
-          for (int i = 0; i < value.length; i++) {
-            nestedData['[$i]'] = value[i];
-          }
+        // 所有数组都可以展开，不仅仅是包含Map的数组
+        isExpandable = true;
+        nestedData = {};
+        for (int i = 0; i < value.length; i++) {
+          nestedData['[$i]'] = value[i];
         }
       } else {
         valueText = value.toString();
