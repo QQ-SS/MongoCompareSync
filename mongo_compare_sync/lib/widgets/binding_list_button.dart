@@ -13,6 +13,8 @@ class BindingListButton extends ConsumerStatefulWidget {
   final Function(CollectionBinding) onRemoveBinding;
   final Function(CollectionBinding) onScrollToBinding;
   final Function() onClearAllBindings;
+  final Function(CollectionBinding)? onAddBinding; // 新增：添加绑定的回调
+  final Function(String?, String?)? onConnectionChange; // 新增：更改连接的回调
 
   const BindingListButton({
     super.key,
@@ -22,6 +24,8 @@ class BindingListButton extends ConsumerStatefulWidget {
     required this.onRemoveBinding,
     required this.onScrollToBinding,
     required this.onClearAllBindings,
+    this.onAddBinding, // 可选参数
+    this.onConnectionChange, // 可选参数
   });
 
   @override
@@ -351,27 +355,53 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('选择要比较的绑定 - ${task.name}'),
+        title: Text('加载任务 - ${task.name}'),
         content: SizedBox(
           width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: task.bindings.length,
-            itemBuilder: (context, index) {
-              final binding = task.bindings[index];
-              return ListTile(
-                title: Text(
-                  '${binding.sourceDatabaseName}.${binding.sourceCollection}',
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('此操作将清空当前的集合绑定列表，并加载以下 ${task.bindings.length} 个绑定：'),
+              const SizedBox(height: 8),
+              // 使用固定数量的绑定显示，而不是ListView
+              ...task.bindings
+                  .take(5)
+                  .map(
+                    (binding) => Padding(
+                      padding: const EdgeInsets.only(top: 4, bottom: 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${binding.sourceDatabaseName}.${binding.sourceCollection}',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            '→ ${binding.targetDatabaseName}.${binding.targetCollection}',
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).textTheme.bodySmall?.color,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              // 如果绑定数量超过5个，显示"更多"提示
+              if (task.bindings.length > 5)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    '...以及其他 ${task.bindings.length - 5} 个绑定',
+                    style: TextStyle(
+                      fontStyle: FontStyle.italic,
+                      color: Theme.of(context).textTheme.bodySmall?.color,
+                    ),
+                  ),
                 ),
-                subtitle: Text(
-                  '→ ${binding.targetDatabaseName}.${binding.targetCollection}',
-                ),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _navigateToComparisonScreen(task, binding);
-                },
-              );
-            },
+            ],
           ),
         ),
         actions: [
@@ -379,9 +409,58 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('取消'),
           ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _loadAllBindings(task);
+            },
+            child: const Text('确认'),
+          ),
         ],
       ),
     );
+  }
+
+  // 加载所有绑定到列表
+  void _loadAllBindings(ComparisonTask task) {
+    // 清空当前绑定列表
+    widget.onClearAllBindings();
+
+    // 更改连接（如果提供了回调）
+    if (widget.onConnectionChange != null) {
+      widget.onConnectionChange!(
+        task.sourceConnectionId,
+        task.targetConnectionId,
+      );
+    }
+
+    // 将任务中的所有绑定添加到绑定列表
+    for (final bindingConfig in task.bindings) {
+      final binding = CollectionBinding(
+        id: '${DateTime.now().millisecondsSinceEpoch}_${bindingConfig.sourceCollection}_${bindingConfig.targetCollection}',
+        sourceCollection: bindingConfig.sourceCollection,
+        targetCollection: bindingConfig.targetCollection,
+        sourceDatabase: bindingConfig.sourceDatabaseName,
+        targetDatabase: bindingConfig.targetDatabaseName,
+      );
+
+      // 如果提供了添加绑定的回调，使用它来添加绑定
+      if (widget.onAddBinding != null) {
+        widget.onAddBinding!(binding);
+      }
+    }
+
+    // 显示成功消息
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('已加载任务 "${task.name}" 的 ${task.bindings.length} 个绑定'),
+      ),
+    );
+
+    // 关闭绑定列表面板
+    setState(() {
+      _showBindingsList = false;
+    });
   }
 
   // 导航到比较结果页面
