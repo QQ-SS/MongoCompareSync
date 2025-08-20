@@ -39,6 +39,11 @@ final enableLoggingProvider =
       (ref) => EnableLoggingNotifier(),
     );
 
+// 最大加载文档数量提供者
+final maxDocumentsProvider = StateNotifierProvider<MaxDocumentsNotifier, int>(
+  (ref) => MaxDocumentsNotifier(),
+);
+
 // 默认规则ID提供者
 final defaultRuleIdProvider =
     StateNotifierProvider<DefaultRuleIdNotifier, String?>(
@@ -181,6 +186,29 @@ class EnableLoggingNotifier extends StateNotifier<bool> {
   Future<void> _saveSetting(bool value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('enableLogging', value);
+  }
+}
+
+// 最大加载文档数量状态管理
+class MaxDocumentsNotifier extends StateNotifier<int> {
+  MaxDocumentsNotifier() : super(2000) {
+    _loadSetting();
+  }
+
+  Future<void> _loadSetting() async {
+    final prefs = await SharedPreferences.getInstance();
+    state = prefs.getInt('maxDocuments') ?? 2000;
+  }
+
+  @override
+  set state(int value) {
+    super.state = value;
+    _saveSetting(value);
+  }
+
+  Future<void> _saveSetting(int value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('maxDocuments', value);
   }
 }
 

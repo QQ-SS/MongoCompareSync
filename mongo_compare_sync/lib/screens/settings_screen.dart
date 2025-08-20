@@ -10,6 +10,7 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
     final enableLogging = ref.watch(enableLoggingProvider);
+    final maxDocuments = ref.watch(maxDocumentsProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('应用设置')),
@@ -58,6 +59,46 @@ class SettingsScreen extends ConsumerWidget {
                           value: ThemeMode.dark,
                           child: Text('暗黑模式'),
                         ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // 比较设置
+          Card(
+            elevation: 2,
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '比较设置',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  ListTile(
+                    title: const Text('最大加载文档数量'),
+                    subtitle: const Text('比较时最多加载的文档数量，设置过大可能导致性能问题'),
+                    trailing: DropdownButton<int>(
+                      value: maxDocuments,
+                      onChanged: (value) {
+                        if (value != null) {
+                          ref.read(maxDocumentsProvider.notifier).state = value;
+                        }
+                      },
+                      items: const [
+                        DropdownMenuItem(value: 0, child: Text('无限制')),
+                        DropdownMenuItem(value: 500, child: Text('500')),
+                        DropdownMenuItem(value: 1000, child: Text('1000')),
+                        DropdownMenuItem(value: 2000, child: Text('2000')),
+                        DropdownMenuItem(value: 5000, child: Text('5000')),
+                        DropdownMenuItem(value: 10000, child: Text('10000')),
                       ],
                     ),
                   ),

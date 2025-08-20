@@ -4,6 +4,7 @@ import 'package:mongo_dart/mongo_dart.dart' hide Center;
 
 import '../models/document.dart';
 import '../providers/connection_provider.dart';
+import '../providers/settings_provider.dart';
 import '../services/mongo_service.dart';
 
 class DocumentTreeComparisonScreen extends ConsumerStatefulWidget {
@@ -1314,14 +1315,17 @@ class _DocumentTreeComparisonScreenState
     });
 
     try {
-      // 从源数据库加载全量文档
+      // 获取最大加载文档数量设置
+      final maxDocuments = ref.read(maxDocumentsProvider);
+
+      // 从源数据库加载文档
       if (widget.sourceConnectionId != null) {
         try {
           final sourceDocs = await _mongoService.getDocuments(
             widget.sourceConnectionId!,
             widget.sourceDatabaseName,
             widget.sourceCollection,
-            limit: 0, // 获取所有文档
+            limit: maxDocuments, // 使用设置的最大文档数量
           );
 
           print('从源数据库加载了 ${sourceDocs.length} 个文档');
@@ -1339,14 +1343,14 @@ class _DocumentTreeComparisonScreenState
         }
       }
 
-      // 从目标数据库加载全量文档
+      // 从目标数据库加载文档
       if (widget.targetConnectionId != null) {
         try {
           final targetDocs = await _mongoService.getDocuments(
             widget.targetConnectionId!,
             widget.targetDatabaseName,
             widget.targetCollection,
-            limit: 0, // 获取所有文档
+            limit: maxDocuments, // 使用设置的最大文档数量
           );
 
           print('从目标数据库加载了 ${targetDocs.length} 个文档');
