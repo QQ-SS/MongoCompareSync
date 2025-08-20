@@ -554,7 +554,17 @@ class _DocumentTreeComparisonScreenState
               items: [
                 PopupMenuItem(
                   value: isIgnored ? 'unignore' : 'ignore',
-                  child: Text(isIgnored ? '取消忽略' : '忽略'),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isIgnored ? Icons.visibility : Icons.visibility_off,
+                        size: 18,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(isIgnored ? '取消忽略' : '忽略'),
+                    ],
+                  ),
                 ),
               ],
             ).then((value) {

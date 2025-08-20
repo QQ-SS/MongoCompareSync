@@ -461,10 +461,10 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
       ),
     );
 
-    // 关闭绑定列表面板
-    setState(() {
-      _showBindingsList = false;
-    });
+    // // 关闭绑定列表面板
+    // setState(() {
+    //   _showBindingsList = false;
+    // });
   }
 
   // 导航到比较结果页面

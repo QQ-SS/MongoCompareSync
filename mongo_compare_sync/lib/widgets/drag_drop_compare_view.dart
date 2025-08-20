@@ -5,6 +5,7 @@ import '../models/connection.dart';
 import '../widgets/database_collection_panel.dart';
 import '../widgets/binding_list_button.dart';
 import '../providers/connection_provider.dart';
+import '../providers/compare_view_provider.dart';
 
 class DragDropCompareView extends ConsumerStatefulWidget {
   const DragDropCompareView({super.key});
@@ -16,13 +17,16 @@ class DragDropCompareView extends ConsumerStatefulWidget {
 
 class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
     with TickerProviderStateMixin {
-  final List<BindingConfig> _bindings = [];
   final GlobalKey<DatabaseCollectionPanelState> _sourceKey = GlobalKey();
   final GlobalKey<DatabaseCollectionPanelState> _targetKey = GlobalKey();
   final GlobalKey _painterKey = GlobalKey();
-  // MongoDB服务实例通过Provider获取
-  MongoConnection? _sourceConnection;
-  MongoConnection? _targetConnection;
+
+  // 使用 provider 中的状态
+  List<BindingConfig> get _bindings => ref.watch(compareViewProvider).bindings;
+  MongoConnection? get _sourceConnection =>
+      ref.watch(compareViewProvider).sourceConnection;
+  MongoConnection? get _targetConnection =>
+      ref.watch(compareViewProvider).targetConnection;
 
   Widget _buildConnectionDropdown({
     required String label,
@@ -182,15 +186,11 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
   }
 
   void onSourceConnectionChanged(MongoConnection? connection) {
-    setState(() {
-      _sourceConnection = connection;
-    });
+    ref.read(compareViewProvider.notifier).setSourceConnection(connection);
   }
 
   void onTargetConnectionChanged(MongoConnection? connection) {
-    setState(() {
-      _targetConnection = connection;
-    });
+    ref.read(compareViewProvider.notifier).setTargetConnection(connection);
   }
 
   void _createBinding(
@@ -207,23 +207,15 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
       idField: '_id', // 默认使用_id作为ID字段
       ignoredFields: [], // 默认为空，可以在比较界面中设置
     );
-    if (!_bindings.contains(binding)) {
-      setState(() {
-        _bindings.add(binding);
-      });
-    }
+    ref.read(compareViewProvider.notifier).addBinding(binding);
   }
 
   void _removeBinding(BindingConfig binding) {
-    setState(() {
-      _bindings.remove(binding);
-    });
+    ref.read(compareViewProvider.notifier).removeBinding(binding);
   }
 
   void _clearAllBindings() {
-    setState(() {
-      _bindings.clear();
-    });
+    ref.read(compareViewProvider.notifier).clearAllBindings();
   }
 
   // 滚动单个绑定到可见区域
@@ -267,11 +259,7 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
 
   // 添加绑定
   void _addBinding(BindingConfig binding) {
-    if (!_bindings.contains(binding)) {
-      setState(() {
-        _bindings.add(binding);
-      });
-    }
+    ref.read(compareViewProvider.notifier).addBinding(binding);
   }
 
   // 更改连接
@@ -289,7 +277,9 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
             (conn) => conn.id == sourceConnectionId,
             orElse: () => _sourceConnection ?? connections.first,
           );
-          onSourceConnectionChanged(sourceConn);
+          ref
+              .read(compareViewProvider.notifier)
+              .setSourceConnection(sourceConn);
         }
 
         // 更新目标连接
@@ -298,7 +288,9 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
             (conn) => conn.id == targetConnectionId,
             orElse: () => _targetConnection ?? connections.first,
           );
-          onTargetConnectionChanged(targetConn);
+          ref
+              .read(compareViewProvider.notifier)
+              .setTargetConnection(targetConn);
         }
       });
     }
