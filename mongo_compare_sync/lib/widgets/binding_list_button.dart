@@ -238,6 +238,8 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
             targetCollection: binding.targetCollection,
             sourceDatabaseName: binding.sourceDatabase,
             targetDatabaseName: binding.targetDatabase,
+            idField: '_id', // 默认使用_id作为ID字段
+            ignoredFields: [], // 默认为空，可以在比较界面中设置
           ),
         )
         .toList();
@@ -394,8 +396,10 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
           targetDatabaseName: binding.targetDatabaseName,
           sourceConnectionId: task.sourceConnectionId,
           targetConnectionId: task.targetConnectionId,
-          idField: task.idField,
-          ignoredFields: task.ignoredFields,
+          idField: binding.idField ?? task.idField,
+          ignoredFields: binding.ignoredFields.isNotEmpty
+              ? binding.ignoredFields
+              : task.ignoredFields,
         ),
       ),
     );

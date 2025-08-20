@@ -3,12 +3,16 @@ class BindingConfig {
   final String targetCollection;
   final String sourceDatabaseName;
   final String targetDatabaseName;
+  final String? idField;
+  final List<String> ignoredFields;
 
   BindingConfig({
     required this.sourceCollection,
     required this.targetCollection,
     required this.sourceDatabaseName,
     required this.targetDatabaseName,
+    this.idField = '_id',
+    this.ignoredFields = const [],
   });
 
   // 从JSON反序列化
@@ -18,6 +22,12 @@ class BindingConfig {
       targetCollection: json['targetCollection'] as String,
       sourceDatabaseName: json['sourceDatabaseName'] as String,
       targetDatabaseName: json['targetDatabaseName'] as String,
+      idField: json['idField'] as String? ?? '_id',
+      ignoredFields:
+          (json['ignoredFields'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          [],
     );
   }
 
@@ -28,6 +38,8 @@ class BindingConfig {
       'targetCollection': targetCollection,
       'sourceDatabaseName': sourceDatabaseName,
       'targetDatabaseName': targetDatabaseName,
+      'idField': idField,
+      'ignoredFields': ignoredFields,
     };
   }
 }
@@ -69,6 +81,8 @@ class ComparisonTask {
           targetCollection: targetCollection,
           sourceDatabaseName: sourceDatabaseName,
           targetDatabaseName: targetDatabaseName,
+          idField: idField,
+          ignoredFields: ignoredFields ?? [],
         ),
       ],
       sourceConnectionId: sourceConnectionId,
