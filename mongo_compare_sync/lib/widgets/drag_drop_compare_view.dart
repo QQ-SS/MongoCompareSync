@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/connection.dart';
 import '../models/collection_binding.dart';
-import '../services/mongo_service.dart';
 import '../widgets/database_collection_panel.dart';
 import '../widgets/binding_list_button.dart';
 import '../providers/connection_provider.dart';

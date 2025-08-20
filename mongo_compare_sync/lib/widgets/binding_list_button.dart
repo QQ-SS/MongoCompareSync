@@ -3,8 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/collection_binding.dart';
 import '../models/connection.dart';
 import '../screens/document_tree_comparison_screen.dart';
-import '../services/mongo_service.dart';
-import '../providers/connection_provider.dart';
 
 class BindingListButton extends ConsumerStatefulWidget {
   final List<CollectionBinding> bindings;

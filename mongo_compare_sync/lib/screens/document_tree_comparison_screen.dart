@@ -54,6 +54,8 @@ class _DocumentTreeComparisonScreenState
   final ScrollController _targetScrollController = ScrollController();
   // 加载状态
   bool _isLoading = true;
+  // 存储忽略的字段列表（可变）
+  final List<String> _ignoredFields = [];
 
   // 操作状态
   bool _isProcessing = false;
@@ -64,9 +66,6 @@ class _DocumentTreeComparisonScreenState
 
   @override
   Widget build(BuildContext context) {
-    // 对文档进行排序：先显示两边都存在的文档，再显示只在一边存在的文档
-    final sortedResults = _diffResults;
-
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -75,7 +74,7 @@ class _DocumentTreeComparisonScreenState
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _buildComparisonView(sortedResults),
+          : _buildComparisonView(_diffResults),
     );
   }
 
@@ -422,7 +421,7 @@ class _DocumentTreeComparisonScreenState
       final String fieldPath = '$parentPath.$key';
 
       // 检查是否为忽略字段
-      final bool isIgnored = widget.ignoredFields.contains(key);
+      final bool isIgnored = _ignoredFields.contains(key);
 
       // 检查字段是否有差异
       final bool hasDiff = _hasFieldDiff(diff, fieldPath);
@@ -458,7 +457,7 @@ class _DocumentTreeComparisonScreenState
       }
 
       fieldWidgets.add(
-        InkWell(
+        GestureDetector(
           onTap: () {
             setState(() {
               if (_selectedPath == fieldPath && _isSourceSelected == isSource) {
@@ -474,6 +473,53 @@ class _DocumentTreeComparisonScreenState
             // 提取文档ID并滚动到匹配文档
             final docId = parentPath.split('.').first;
             _scrollToMatchingDocument(docId, isSource);
+          },
+          onSecondaryTap: () {
+            // 显示上下文菜单
+            final RenderBox button = context.findRenderObject() as RenderBox;
+            final RenderBox overlay =
+                Overlay.of(context).context.findRenderObject() as RenderBox;
+            final RelativeRect position = RelativeRect.fromRect(
+              Rect.fromPoints(
+                button.localToGlobal(Offset.zero, ancestor: overlay),
+                button.localToGlobal(
+                  button.size.bottomRight(Offset.zero),
+                  ancestor: overlay,
+                ),
+              ),
+              Offset.zero & overlay.size,
+            );
+
+            showMenu(
+              context: context,
+              position: position,
+              items: [
+                PopupMenuItem(
+                  value: isIgnored ? 'unignore' : 'ignore',
+                  child: Text(isIgnored ? '取消忽略' : '忽略'),
+                ),
+              ],
+            ).then((value) {
+              if (value == 'ignore') {
+                // 添加到忽略字段列表
+                if (!_ignoredFields.contains(key)) {
+                  setState(() {
+                    _ignoredFields.add(key);
+                    // 重新比较文档
+                    _compareDocuments();
+                  });
+                }
+              } else if (value == 'unignore') {
+                // 从忽略字段列表中移除
+                if (_ignoredFields.contains(key)) {
+                  setState(() {
+                    _ignoredFields.remove(key);
+                    // 重新比较文档
+                    _compareDocuments();
+                  });
+                }
+              }
+            });
           },
           child: Container(
             color: _getFieldBackgroundColor(
