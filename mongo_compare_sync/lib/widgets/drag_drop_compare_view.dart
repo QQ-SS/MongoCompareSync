@@ -28,6 +28,7 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
     required String label,
     required List<MongoConnection> connections,
     required Function(MongoConnection?) onConnectionChanged,
+    MongoConnection? selectedConnection,
   }) {
     final uniqueConnections = <String, MongoConnection>{};
     for (final conn in connections) {
@@ -41,7 +42,7 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
         Text(label, style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 8),
         DropdownButtonFormField<String?>(
-          // value:selectedConnection.id,
+          value: selectedConnection?.id,
           decoration: InputDecoration(
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             contentPadding: const EdgeInsets.symmetric(horizontal: 16),
@@ -88,6 +89,7 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                       label: '源连接',
                       connections: connections,
                       onConnectionChanged: onSourceConnectionChanged,
+                      selectedConnection: _sourceConnection,
                     ),
                   ),
                   const Spacer(flex: 1),
@@ -97,6 +99,7 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                       label: '目标连接',
                       connections: connections,
                       onConnectionChanged: onTargetConnectionChanged,
+                      selectedConnection: _targetConnection,
                     ),
                   ),
                 ],
