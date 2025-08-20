@@ -36,6 +36,7 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
   final ComparisonTaskRepository _taskRepository = ComparisonTaskRepository();
   List<ComparisonTask>? _savedTasks;
   bool _isLoadingTasks = false;
+  String? _currentTaskName; // 添加当前任务名变量
 
   @override
   Widget build(BuildContext context) {
@@ -191,7 +192,9 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
 
   // 显示保存任务对话框
   void _showSaveTaskDialog() {
-    final TextEditingController nameController = TextEditingController();
+    final TextEditingController nameController = TextEditingController(
+      text: _currentTaskName,
+    );
 
     showDialog(
       context: context,
@@ -219,6 +222,9 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
             onPressed: () {
               if (nameController.text.isNotEmpty) {
                 _saveTask(nameController.text);
+                setState(() {
+                  _currentTaskName = nameController.text;
+                });
                 Navigator.of(context).pop();
               }
             },
@@ -423,6 +429,11 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
 
   // 加载所有绑定到列表
   void _loadAllBindings(ComparisonTask task) {
+    // 保存当前任务名
+    setState(() {
+      _currentTaskName = task.name;
+    });
+
     // 清空当前绑定列表
     widget.onClearAllBindings();
 
