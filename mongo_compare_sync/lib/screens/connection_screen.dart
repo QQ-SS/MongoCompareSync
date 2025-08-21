@@ -40,6 +40,9 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
     });
     // 更新全局选中的连接
     ref.read(selectedConnectionProvider.notifier).state = connection;
+    setState(() {
+      _testResult = null;
+    });
   }
 
   void _handleEditConnection(MongoConnection connection) {
@@ -324,7 +327,7 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
           children: [
             // 连接列表区域
             Expanded(
-              flex: 2,
+              flex: 3,
               child: Card(
                 margin: EdgeInsets.all(
                   ResponsiveLayoutUtil.getResponsiveSpacing(context),
@@ -339,7 +342,7 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
 
             // 连接表单/详情区域
             Expanded(
-              flex: 3,
+              flex: 2,
               child: Card(
                 margin: EdgeInsets.all(
                   ResponsiveLayoutUtil.getResponsiveSpacing(context),

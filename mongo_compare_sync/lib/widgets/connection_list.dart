@@ -56,12 +56,20 @@ class ConnectionList extends ConsumerWidget {
                 ), // Removed Stack and isConnected indicator
                 title: Row(
                   children: [
-                    Text(connection.name),
+                    Expanded(
+                      child: Text(
+                        connection.name,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    ),
                     // Removed isConnected badge
                   ],
                 ),
                 subtitle: Text(
                   '${connection.host}:${connection.port}${connection.authSource != null && connection.authSource!.isNotEmpty ? '/?authSource=${connection.authSource}' : ''}',
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,

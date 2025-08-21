@@ -254,16 +254,16 @@ class _ConnectionFormState extends ConsumerState<ConnectionForm> {
                   return null;
                 },
               ),
-            ],
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _databaseController,
-              decoration: const InputDecoration(
-                labelText: '数据库名称 (可选)',
-                hintText: '留空以列出所有数据库',
-                prefixIcon: Icon(Icons.storage),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _databaseController,
+                decoration: const InputDecoration(
+                  labelText: '认证数据库 (可选)',
+                  hintText: '',
+                  prefixIcon: Icon(Icons.storage),
+                ),
               ),
-            ),
+            ],
             const SizedBox(height: 24),
             if (_testResult != null)
               Padding(
