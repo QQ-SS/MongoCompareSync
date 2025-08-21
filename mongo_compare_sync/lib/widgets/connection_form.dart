@@ -133,7 +133,7 @@ class _ConnectionFormState extends ConsumerState<ConnectionForm> {
     }
 
     try {
-      final connection = _buildConnection();
+      final newConnection = _buildConnection();
       final notifier = ref.read(connectionsProvider.notifier);
 
       // 显示保存中的加载指示器
@@ -153,9 +153,19 @@ class _ConnectionFormState extends ConsumerState<ConnectionForm> {
 
       // 保存连接
       if (widget.initialConnection != null) {
-        await notifier.updateConnection(connection);
+        final oldId = widget.initialConnection!.id;
+        final newId = newConnection.id;
+
+        // 如果ID发生变化，需要删除旧连接并添加新连接
+        if (oldId != newId) {
+          await notifier.removeConnection(widget.initialConnection!);
+          await notifier.addConnection(newConnection);
+        } else {
+          // ID没有变化，直接更新
+          await notifier.updateConnection(newConnection);
+        }
       } else {
-        await notifier.addConnection(connection);
+        await notifier.addConnection(newConnection);
       }
 
       // 关闭加载对话框
@@ -186,7 +196,7 @@ class _ConnectionFormState extends ConsumerState<ConnectionForm> {
   }
 
   MongoConnection _buildConnection() {
-    final connection = widget.initialConnection;
+    // 始终使用用户输入的名称作为id
     return MongoConnection(
       id: _nameController.text,
       host: _hostController.text,

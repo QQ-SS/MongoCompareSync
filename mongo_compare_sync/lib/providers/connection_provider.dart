@@ -123,6 +123,20 @@ class ConnectionsNotifier
     }
   }
 
+  // 删除连接对象
+  Future<void> removeConnection(MongoConnection connection) async {
+    try {
+      await _repository.deleteConnection(connection.id);
+      state.whenData((connections) {
+        state = AsyncValue.data(
+          connections.where((conn) => conn.id != connection.id).toList(),
+        );
+      });
+    } catch (error, stackTrace) {
+      state = AsyncValue.error(error, stackTrace);
+    }
+  }
+
   // 测试连接
   Future<bool> testConnection(MongoConnection connection) async {
     try {
