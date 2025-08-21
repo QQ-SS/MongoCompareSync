@@ -329,7 +329,7 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
             sourceDatabaseName: binding.sourceDatabaseName,
             targetDatabaseName: binding.targetDatabaseName,
             idField: binding.idField ?? '_id', // 默认使用_id作为ID字段
-            ignoredFields: binding.ignoredFields ?? [], // 默认为空，可以在比较界面中设置
+            ignoredFields: binding.ignoredFields, // 默认为空，可以在比较界面中设置
           ),
         )
         .toList();
@@ -542,18 +542,13 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
       return;
     }
 
-    setState(() {
-      _isProcessing = true;
-    });
+    setState(() {});
 
     // 依次处理每个绑定
     for (int i = 0; i < widget.bindings.length; i++) {
       final binding = widget.bindings[i];
 
-      setState(() {
-        _processingMessage =
-            '正在比较 ${i + 1}/${widget.bindings.length}: ${binding.sourceCollection} vs ${binding.targetCollection}';
-      });
+      setState(() {});
 
       try {
         // 使用MongoService直接比较集合
@@ -601,10 +596,7 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
       await Future.delayed(const Duration(milliseconds: 100));
     }
 
-    setState(() {
-      _isProcessing = false;
-      _processingMessage = null;
-    });
+    setState(() {});
 
     // 显示完成消息
     ScaffoldMessenger.of(
@@ -614,8 +606,6 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
 
   // 存储比较结果的Map
   final Map<String, Map<String, dynamic>> _comparisonResults = {};
-  bool _isProcessing = false;
-  String? _processingMessage;
 
   // 存储每个绑定的比较状态
   final Map<String, Map<String, dynamic>> _bindingCompareStatus = {};
@@ -640,7 +630,7 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
             sourceConnectionId: widget.sourceConnection?.id,
             targetConnectionId: widget.targetConnection?.id,
             idField: binding.idField,
-            ignoredFields: binding.ignoredFields ?? [],
+            ignoredFields: binding.ignoredFields,
             onIgnoredFieldsChanged: (updatedIgnoredFields) {
               _updateBindingIgnoredFields(binding, updatedIgnoredFields);
             },
@@ -659,7 +649,7 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
             sourceConnectionId: widget.sourceConnection?.id,
             targetConnectionId: widget.targetConnection?.id,
             idField: binding.idField,
-            ignoredFields: binding.ignoredFields ?? [],
+            ignoredFields: binding.ignoredFields,
             onIgnoredFieldsChanged: (updatedIgnoredFields) {
               _updateBindingIgnoredFields(binding, updatedIgnoredFields);
             },
@@ -744,7 +734,7 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
           targetDoc,
           docId,
           fieldDiffs,
-          binding.ignoredFields ?? [],
+          binding.ignoredFields,
         );
 
         if (fieldDiffs.isEmpty) {

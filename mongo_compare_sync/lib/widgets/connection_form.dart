@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/connection.dart';
 import '../providers/connection_provider.dart';
-import 'package:uuid/uuid.dart';
 
 class ConnectionForm extends ConsumerStatefulWidget {
   final MongoConnection? initialConnection;

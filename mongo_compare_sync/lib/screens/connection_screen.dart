@@ -288,8 +288,8 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
   Widget build(BuildContext context) {
     final platformService = PlatformService.instance;
     final padding = platformService.getPlatformPadding();
-    ResponsiveLayoutUtil.isLargeScreen(context);
-    final isMediumScreen = ResponsiveLayoutUtil.isMediumScreen(context);
+    // ResponsiveLayoutUtil.isLargeScreen(context);
+    // final isMediumScreen = ResponsiveLayoutUtil.isMediumScreen(context);
 
     // 响应式布局
     return ResponsiveLayout(

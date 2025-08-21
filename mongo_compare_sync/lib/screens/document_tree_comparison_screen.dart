@@ -250,7 +250,7 @@ class _DocumentTreeComparisonScreenState
                 ElevatedButton.icon(
                   icon: const Icon(Icons.arrow_back),
                   label: Text(
-                    selectionType != null ? '复制${selectionType}到源' : '复制到源',
+                    selectionType != null ? '复制$selectionType到源' : '复制到源',
                   ),
                   onPressed: canCopyToSource ? _copyToSource : null,
                 ),
@@ -259,7 +259,7 @@ class _DocumentTreeComparisonScreenState
                 ElevatedButton.icon(
                   icon: const Icon(Icons.delete),
                   label: Text(
-                    selectionType != null ? '删除${selectionType}' : '删除',
+                    selectionType != null ? '删除$selectionType' : '删除',
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Theme.of(context).colorScheme.error,
@@ -296,7 +296,7 @@ class _DocumentTreeComparisonScreenState
                 ElevatedButton.icon(
                   icon: const Icon(Icons.delete),
                   label: Text(
-                    selectionType != null ? '删除${selectionType}' : '删除',
+                    selectionType != null ? '删除$selectionType' : '删除',
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Theme.of(context).colorScheme.error,
@@ -309,7 +309,7 @@ class _DocumentTreeComparisonScreenState
                 ElevatedButton.icon(
                   icon: const Icon(Icons.arrow_forward),
                   label: Text(
-                    selectionType != null ? '复制${selectionType}到目标' : '复制到目标',
+                    selectionType != null ? '复制$selectionType到目标' : '复制到目标',
                   ),
                   onPressed: canCopyToTarget ? _copyToTarget : null,
                 ),
@@ -662,8 +662,6 @@ class _DocumentTreeComparisonScreenState
           },
           onSecondaryTapDown: (details) {
             // 显示上下文菜单，使用点击位置
-            final RenderBox overlay =
-                Overlay.of(context).context.findRenderObject() as RenderBox;
             final RelativeRect position = RelativeRect.fromLTRB(
               details.globalPosition.dx,
               details.globalPosition.dy,
@@ -1285,10 +1283,10 @@ class _DocumentTreeComparisonScreenState
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('删除'),
             style: TextButton.styleFrom(
               foregroundColor: Theme.of(context).colorScheme.error,
             ),
+            child: const Text('删除'),
           ),
         ],
       ),
@@ -1361,10 +1359,10 @@ class _DocumentTreeComparisonScreenState
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('删除'),
             style: TextButton.styleFrom(
               foregroundColor: Theme.of(context).colorScheme.error,
             ),
+            child: const Text('删除'),
           ),
         ],
       ),
