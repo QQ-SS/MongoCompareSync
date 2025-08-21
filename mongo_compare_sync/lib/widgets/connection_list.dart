@@ -1,0 +1,138 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/connection.dart';
+import '../providers/connection_provider.dart';
+import '../widgets/loading_indicator.dart';
+
+class ConnectionList extends ConsumerWidget {
+  final Function(MongoConnection) onConnectionSelected;
+  final Function(MongoConnection) onEditConnection;
+  final Function(String) onDeleteConnection;
+  final VoidCallback onAddConnection; // New parameter
+
+  const ConnectionList({
+    super.key,
+    required this.onConnectionSelected,
+    required this.onEditConnection,
+    required this.onDeleteConnection,
+    required this.onAddConnection, // New parameter
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final connectionsState = ref.watch(connectionsProvider);
+    final selectedConnection = ref.watch(selectedConnectionProvider);
+
+    return connectionsState.when(
+      data: (connections) {
+        return ListView.builder(
+          itemCount: connections.length + 1, // +1 for the add button
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              // Add Connection button
+              return Card(
+                elevation: 1,
+                margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                child: ListTile(
+                  leading: const Icon(Icons.add_circle_outline),
+                  title: const Text('添加新连接'),
+                  onTap: onAddConnection,
+                ),
+              );
+            }
+
+            final connection = connections[index - 1]; // Adjust index
+            final isSelected = selectedConnection?.id == connection.id;
+
+            return Card(
+              elevation: isSelected ? 4 : 1,
+              margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+              color: isSelected
+                  ? Theme.of(context).colorScheme.primaryContainer
+                  : null,
+              child: ListTile(
+                leading: const Icon(
+                  Icons.storage,
+                ), // Removed Stack and isConnected indicator
+                title: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        connection.id,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    ),
+                    // Removed isConnected badge
+                  ],
+                ),
+                subtitle: Text(
+                  '${connection.host}:${connection.port}${connection.authSource != null && connection.authSource!.isNotEmpty ? '/?authSource=${connection.authSource}' : ''}',
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.edit),
+                      tooltip: '编辑连接',
+                      onPressed: () => onEditConnection(connection),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete),
+                      tooltip: '删除连接',
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('确认删除'),
+                            content: Text('确定要删除连接 "${connection.id}" 吗？'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(),
+                                child: const Text('取消'),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  onDeleteConnection(connection.id);
+                                  Navigator.of(context).pop();
+                                },
+                                child: const Text('删除'),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+                selected: isSelected,
+                onTap: () => onConnectionSelected(connection),
+              ),
+            );
+          },
+        );
+      },
+      loading: () => const Center(
+        child: LoadingIndicator(message: '加载连接列表...', size: 32.0),
+      ),
+      error: (error, stackTrace) => Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, color: Colors.red, size: 48),
+            const SizedBox(height: 16),
+            Text('加载连接失败', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Text(
+              error.toString(),
+              style: Theme.of(context).textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
