@@ -6,8 +6,13 @@ import 'package:uuid/uuid.dart';
 
 class ConnectionForm extends ConsumerStatefulWidget {
   final MongoConnection? initialConnection;
+  final Function(MongoConnection)? onConnectionUpdated;
 
-  const ConnectionForm({super.key, this.initialConnection});
+  const ConnectionForm({
+    super.key,
+    this.initialConnection,
+    this.onConnectionUpdated,
+  });
 
   @override
   ConsumerState<ConnectionForm> createState() => _ConnectionFormState();
@@ -171,6 +176,11 @@ class _ConnectionFormState extends ConsumerState<ConnectionForm> {
       // 关闭加载对话框
       if (mounted && Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
+      }
+
+      // 通知父组件连接已更新
+      if (widget.onConnectionUpdated != null) {
+        widget.onConnectionUpdated!(newConnection);
       }
 
       // 延迟一下再返回上一页，确保状态已更新

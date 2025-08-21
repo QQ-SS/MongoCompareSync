@@ -94,7 +94,14 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
 
   Widget _buildConnectionForm() {
     if (_isEditing) {
-      return ConnectionForm(initialConnection: _selectedConnection);
+      return ConnectionForm(
+        initialConnection: _selectedConnection,
+        onConnectionUpdated: (updatedConnection) {
+          setState(() {
+            _selectedConnection = updatedConnection;
+          });
+        },
+      );
     } else if (_selectedConnection != null) {
       // 显示连接详情
       return _buildConnectionDetails();
