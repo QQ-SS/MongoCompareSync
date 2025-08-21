@@ -250,7 +250,7 @@ class DatabaseCollectionPanelState
                 const SizedBox(width: 32), // 与ListTile的默认间距对齐
                 Expanded(
                   child: Text(
-                    '${_getTypeDisplayName()}集合: ${widget.connection?.name ?? "未选择"}',
+                    '${_getTypeDisplayName()}集合: ${widget.connection?.id ?? "未选择"}',
                     style: Theme.of(context).textTheme.titleMedium,
                     overflow: TextOverflow.ellipsis,
                   ),

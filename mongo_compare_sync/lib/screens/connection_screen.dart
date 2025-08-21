@@ -129,7 +129,7 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              connection.name,
+              connection.id,
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 16),

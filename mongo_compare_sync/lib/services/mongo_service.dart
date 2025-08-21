@@ -44,13 +44,13 @@ class MongoService {
 
   Future<bool> connect(MongoConnection connection) async {
     try {
-      LogService.instance.info('正在连接到MongoDB: ${connection.name}');
+      LogService.instance.info('正在连接到MongoDB: ${connection.id}');
       // 明确连接到 admin 数据库，以便能够列出所有数据库
       final uri = _buildUri(connection, 'admin');
       final db = Db(uri);
       await db.open();
       _connections[connection.id] = (connection: connection, db: db);
-      LogService.instance.info('已成功连接到MongoDB: ${connection.name}');
+      LogService.instance.info('已成功连接到MongoDB: ${connection.id}');
       return true;
     } catch (e, stackTrace) {
       LogService.instance.error('MongoDB连接错误: $e', e, stackTrace);

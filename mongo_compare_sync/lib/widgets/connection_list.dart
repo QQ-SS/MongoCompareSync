@@ -58,7 +58,7 @@ class ConnectionList extends ConsumerWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        connection.name,
+                        connection.id,
                         overflow: TextOverflow.ellipsis,
                         maxLines: 1,
                       ),
@@ -87,7 +87,7 @@ class ConnectionList extends ConsumerWidget {
                           context: context,
                           builder: (context) => AlertDialog(
                             title: const Text('确认删除'),
-                            content: Text('确定要删除连接 "${connection.name}" 吗？'),
+                            content: Text('确定要删除连接 "${connection.id}" 吗？'),
                             actions: [
                               TextButton(
                                 onPressed: () => Navigator.of(context).pop(),

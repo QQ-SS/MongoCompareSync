@@ -43,9 +43,9 @@ class _ConnectionFormState extends ConsumerState<ConnectionForm> {
 
   void _initControllers() {
     final connection = widget.initialConnection;
-    
+
     // 首次初始化控制器
-    _nameController = TextEditingController(text: connection?.name ?? '');
+    _nameController = TextEditingController(text: connection?.id ?? '');
     _hostController = TextEditingController(
       text: connection?.host ?? 'localhost',
     );
@@ -61,28 +61,28 @@ class _ConnectionFormState extends ConsumerState<ConnectionForm> {
     _databaseController = TextEditingController(
       text: connection?.authSource ?? '',
     );
-    
+
     _isAuthEnabled = connection?.username?.isNotEmpty ?? false;
     _testResult = null;
     _controllersInitialized = true;
   }
-  
+
   void _updateControllers() {
     if (!_controllersInitialized) {
       _initControllers();
       return;
     }
-    
+
     final connection = widget.initialConnection;
-    
+
     // 更新控制器的值
-    _nameController.text = connection?.name ?? '';
+    _nameController.text = connection?.id ?? '';
     _hostController.text = connection?.host ?? 'localhost';
     _portController.text = connection?.port.toString() ?? '27017';
     _usernameController.text = connection?.username ?? '';
     _passwordController.text = connection?.password ?? '';
     _databaseController.text = connection?.authSource ?? '';
-    
+
     setState(() {
       _isAuthEnabled = connection?.username?.isNotEmpty ?? false;
       _testResult = null;
@@ -188,8 +188,7 @@ class _ConnectionFormState extends ConsumerState<ConnectionForm> {
   MongoConnection _buildConnection() {
     final connection = widget.initialConnection;
     return MongoConnection(
-      id: connection?.id ?? const Uuid().v4(),
-      name: _nameController.text,
+      id: _nameController.text,
       host: _hostController.text,
       port: int.tryParse(_portController.text) ?? 27017,
       username: _isAuthEnabled ? _usernameController.text : null,

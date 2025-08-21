@@ -9,7 +9,6 @@ part of 'connection.dart';
 MongoConnection _$MongoConnectionFromJson(Map<String, dynamic> json) =>
     MongoConnection(
       id: json['id'] as String,
-      name: json['name'] as String,
       host: json['host'] as String,
       port: (json['port'] as num).toInt(),
       username: json['username'] as String?,
@@ -27,7 +26,6 @@ MongoConnection _$MongoConnectionFromJson(Map<String, dynamic> json) =>
 Map<String, dynamic> _$MongoConnectionToJson(MongoConnection instance) =>
     <String, dynamic>{
       'id': instance.id,
-      'name': instance.name,
       'host': instance.host,
       'port': instance.port,
       'username': instance.username,

@@ -5,7 +5,6 @@ part 'connection.g.dart';
 @JsonSerializable()
 class MongoConnection {
   final String id;
-  final String name;
   final String host;
   final int port;
   final String? username;
@@ -17,7 +16,6 @@ class MongoConnection {
 
   MongoConnection({
     required this.id,
-    required this.name,
     required this.host,
     required this.port,
     this.username,
@@ -35,7 +33,6 @@ class MongoConnection {
 
   MongoConnection copyWith({
     String? id,
-    String? name,
     String? host,
     int? port,
     String? username,
@@ -47,7 +44,6 @@ class MongoConnection {
   }) {
     return MongoConnection(
       id: id ?? this.id,
-      name: name ?? this.name,
       host: host ?? this.host,
       port: port ?? this.port,
       username: username ?? this.username,

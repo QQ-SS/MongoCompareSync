@@ -55,7 +55,7 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
           items: uniqueConnectionsList.map((conn) {
             return DropdownMenuItem<String?>(
               value: conn.id,
-              child: Text(conn.name),
+              child: Text(conn.id),
             );
           }).toList(),
           onChanged: (value) {
