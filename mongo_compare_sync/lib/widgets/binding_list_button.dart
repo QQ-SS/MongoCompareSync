@@ -36,6 +36,7 @@ class BindingListButton extends ConsumerStatefulWidget {
 
 class _BindingListButtonState extends ConsumerState<BindingListButton> {
   bool _showBindingsList = false;
+  bool _isExpanded = false; // 添加控制列表是否放大的状态
   final ComparisonTaskRepository _taskRepository = ComparisonTaskRepository();
   List<ComparisonTask>? _savedTasks;
   String? _currentTaskName; // 添加当前任务名变量
@@ -81,7 +82,7 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
     return Card(
       elevation: 4,
       child: Container(
-        constraints: const BoxConstraints(maxHeight: 200),
+        constraints: BoxConstraints(maxHeight: _isExpanded ? 400 : 200),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -127,6 +128,15 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
                     label: const Text('加载任务'),
                   ),
                   const SizedBox(width: 16),
+                  IconButton(
+                    icon: const Icon(Icons.fullscreen),
+                    onPressed: () {
+                      setState(() {
+                        _isExpanded = !_isExpanded;
+                      });
+                    },
+                    tooltip: _isExpanded ? '恢复默认大小' : '放大显示',
+                  ),
                   IconButton(
                     icon: const Icon(Icons.close),
                     onPressed: () {
