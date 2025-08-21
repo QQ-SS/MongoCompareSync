@@ -28,24 +28,51 @@ class _ConnectionFormState extends ConsumerState<ConnectionForm> {
   @override
   void initState() {
     super.initState();
+    _initControllers();
+  }
+
+  @override
+  void didUpdateWidget(ConnectionForm oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 当 widget.initialConnection 发生变化时，更新表单内容
+    if (oldWidget.initialConnection?.id != widget.initialConnection?.id) {
+      _initControllers();
+    }
+  }
+
+  void _initControllers() {
     final connection = widget.initialConnection;
-    _nameController = TextEditingController(text: connection?.name ?? '');
-    _hostController = TextEditingController(
-      text: connection?.host ?? 'localhost',
-    );
-    _portController = TextEditingController(
-      text: connection?.port.toString() ?? '27017',
-    );
-    _usernameController = TextEditingController(
-      text: connection?.username ?? '',
-    );
-    _passwordController = TextEditingController(
-      text: connection?.password ?? '',
-    );
-    _databaseController = TextEditingController(
-      text: connection?.authSource ?? '',
-    );
+    
+    // 如果控制器已经存在，则更新其值
+    if (_nameController != null) {
+      _nameController.text = connection?.name ?? '';
+      _hostController.text = connection?.host ?? 'localhost';
+      _portController.text = connection?.port.toString() ?? '27017';
+      _usernameController.text = connection?.username ?? '';
+      _passwordController.text = connection?.password ?? '';
+      _databaseController.text = connection?.authSource ?? '';
+    } else {
+      // 首次初始化控制器
+      _nameController = TextEditingController(text: connection?.name ?? '');
+      _hostController = TextEditingController(
+        text: connection?.host ?? 'localhost',
+      );
+      _portController = TextEditingController(
+        text: connection?.port.toString() ?? '27017',
+      );
+      _usernameController = TextEditingController(
+        text: connection?.username ?? '',
+      );
+      _passwordController = TextEditingController(
+        text: connection?.password ?? '',
+      );
+      _databaseController = TextEditingController(
+        text: connection?.authSource ?? '',
+      );
+    }
+    
     _isAuthEnabled = connection?.username?.isNotEmpty ?? false;
+    _testResult = null;
   }
 
   @override
