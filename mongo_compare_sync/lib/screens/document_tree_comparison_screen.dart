@@ -17,6 +17,8 @@ class DocumentTreeComparisonScreen extends ConsumerStatefulWidget {
   final String? idField;
   final List<String> ignoredFields;
   final Function(List<String>)? onIgnoredFieldsChanged; // 添加回调函数
+  final Function(Map<String, dynamic>)? onComparisonComplete; // 添加比较完成回调
+  final Map<String, dynamic>? existingResult; // 添加现有结果参数
 
   const DocumentTreeComparisonScreen({
     super.key,
@@ -29,7 +31,38 @@ class DocumentTreeComparisonScreen extends ConsumerStatefulWidget {
     this.idField = '_id',
     this.ignoredFields = const [],
     this.onIgnoredFieldsChanged, // 初始化回调函数
+    this.onComparisonComplete, // 初始化比较完成回调
+    this.existingResult, // 初始化现有结果参数
   });
+
+  // 从现有结果创建比较屏幕的命名构造函数
+  factory DocumentTreeComparisonScreen.fromExistingResult({
+    Key? key,
+    required Map<String, dynamic> existingResult,
+    required String sourceCollection,
+    required String targetCollection,
+    required String sourceDatabaseName,
+    required String targetDatabaseName,
+    String? sourceConnectionId,
+    String? targetConnectionId,
+    String? idField = '_id',
+    List<String> ignoredFields = const [],
+    Function(List<String>)? onIgnoredFieldsChanged,
+  }) {
+    return DocumentTreeComparisonScreen(
+      key: key,
+      sourceCollection: sourceCollection,
+      targetCollection: targetCollection,
+      sourceDatabaseName: sourceDatabaseName,
+      targetDatabaseName: targetDatabaseName,
+      sourceConnectionId: sourceConnectionId,
+      targetConnectionId: targetConnectionId,
+      idField: idField,
+      ignoredFields: ignoredFields,
+      onIgnoredFieldsChanged: onIgnoredFieldsChanged,
+      existingResult: existingResult,
+    );
+  }
 
   @override
   ConsumerState<DocumentTreeComparisonScreen> createState() =>
@@ -67,6 +100,10 @@ class _DocumentTreeComparisonScreenState
   // MongoDB服务实例
   late final MongoService _mongoService;
 
+  // 比较完成回调的引用
+  Function(Map<String, dynamic>)? get onComparisonComplete =>
+      widget.onComparisonComplete;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -88,11 +125,96 @@ class _DocumentTreeComparisonScreenState
     _loadDocuments();
   }
 
+  // 为外部调用提供一个方法，执行比较并返回结果
+  Future<Map<String, dynamic>> getComparisonResult() async {
+    // 确保文档已加载
+    if (_sourceDocuments.isEmpty || _targetDocuments.isEmpty) {
+      await _loadDocuments();
+    }
+
+    // 如果仍然为空，返回空结果
+    if (_sourceDocuments.isEmpty || _targetDocuments.isEmpty) {
+      return {
+        'sameCount': 0,
+        'diffCount': 0,
+        'sourceOnlyCount': 0,
+        'targetOnlyCount': 0,
+      };
+    }
+
+    // 执行比较
+    await _compareDocuments();
+
+    // 计算统计数据
+    int sameCount = _diffResults
+        .where(
+          (d) =>
+              d.sourceDocument != null &&
+              d.targetDocument != null &&
+              (d.fieldDiffs?.isEmpty ?? true),
+        )
+        .length;
+
+    int diffCount = _diffResults
+        .where(
+          (d) =>
+              d.sourceDocument != null &&
+              d.targetDocument != null &&
+              (d.fieldDiffs?.isNotEmpty ?? false),
+        )
+        .length;
+
+    int sourceOnlyCount = _diffResults
+        .where((d) => d.sourceDocument != null && d.targetDocument == null)
+        .length;
+
+    int targetOnlyCount = _diffResults
+        .where((d) => d.sourceDocument == null && d.targetDocument != null)
+        .length;
+
+    // 创建结果对象
+    final result = {
+      'sameCount': sameCount,
+      'diffCount': diffCount,
+      'sourceOnlyCount': sourceOnlyCount,
+      'targetOnlyCount': targetOnlyCount,
+      'diffResults': _diffResults,
+    };
+
+    return result;
+  }
+
   @override
   void initState() {
     super.initState();
-    // 在didChangeDependencies中初始化
+    // 初始化忽略字段列表
     _ignoredFields = [..._ignoredFields, ...widget.ignoredFields];
+
+    // 如果有现有结果，直接使用
+    if (widget.existingResult != null) {
+      // 设置为不加载状态，因为我们将直接使用现有结果
+      _isLoading = false;
+
+      // 从现有结果中提取数据
+      if (widget.existingResult!.containsKey('diffResults')) {
+        final diffResults =
+            widget.existingResult!['diffResults'] as List<dynamic>;
+
+        for (final diff in diffResults) {
+          final docDiff = diff as DocumentDiff;
+          _diffResults.add(docDiff);
+
+          // 填充源文档和目标文档映射
+          if (docDiff.sourceDocument != null) {
+            _sourceDocuments[docDiff.id] = docDiff.sourceDocument!;
+          }
+
+          if (docDiff.targetDocument != null) {
+            _targetDocuments[docDiff.id] = docDiff.targetDocument!;
+          }
+        }
+      }
+    }
   }
 
   // 构建操作按钮栏
@@ -790,6 +912,78 @@ class _DocumentTreeComparisonScreenState
     }
   }
 
+  // 比较文档并返回结果
+  Future<Map<String, dynamic>> compareDocumentsAndGetResult() async {
+    // 加载文档
+    await _loadDocuments();
+
+    if (_sourceDocuments.isEmpty || _targetDocuments.isEmpty) {
+      return {
+        'sameCount': 0,
+        'diffCount': 0,
+        'sourceOnlyCount': 0,
+        'targetOnlyCount': 0,
+      };
+    }
+
+    // 比较文档
+    _diffResults.clear();
+    // 取源、目标文档的所有id并集，然后进行比较
+    final ids = {..._sourceDocuments.keys, ..._targetDocuments.keys}.toList();
+
+    int sameCount = 0;
+    int diffCount = 0;
+    int sourceOnlyCount = 0;
+    int targetOnlyCount = 0;
+
+    // 更新差异状态
+    for (int i = 0; i < ids.length; i++) {
+      final docId = ids[i];
+      final sourceDoc = _sourceDocuments[docId];
+      final targetDoc = _targetDocuments[docId];
+
+      // 比较文档字段
+      final fieldDiffs = <String>[];
+      if (sourceDoc != null && targetDoc != null) {
+        _compareDocument(sourceDoc, targetDoc, docId, fieldDiffs);
+        if (fieldDiffs.isEmpty) {
+          sameCount++;
+        } else {
+          diffCount++;
+        }
+      } else if (sourceDoc != null) {
+        sourceOnlyCount++;
+      } else if (targetDoc != null) {
+        targetOnlyCount++;
+      }
+
+      _diffResults.add(
+        DocumentDiff(
+          id: docId,
+          sourceDocument: sourceDoc,
+          targetDocument: targetDoc,
+          fieldDiffs: fieldDiffs,
+        ),
+      );
+    }
+
+    // 创建结果对象
+    final result = {
+      'sameCount': sameCount,
+      'diffCount': diffCount,
+      'sourceOnlyCount': sourceOnlyCount,
+      'targetOnlyCount': targetOnlyCount,
+      'diffResults': _diffResults,
+    };
+
+    // 如果有回调，通知比较完成
+    if (onComparisonComplete != null) {
+      onComparisonComplete!(result);
+    }
+
+    return result;
+  }
+
   // 比较文档
   Future<void> _compareDocuments() async {
     if (_sourceDocuments.isEmpty || _targetDocuments.isEmpty) {
@@ -826,6 +1020,40 @@ class _DocumentTreeComparisonScreenState
             fieldDiffs: fieldDiffs,
           ),
         );
+      }
+
+      // 如果有回调，通知比较完成
+      if (onComparisonComplete != null) {
+        final result = {
+          'sameCount': _diffResults
+              .where(
+                (d) =>
+                    d.sourceDocument != null &&
+                    d.targetDocument != null &&
+                    (d.fieldDiffs?.isEmpty ?? true),
+              )
+              .length,
+          'diffCount': _diffResults
+              .where(
+                (d) =>
+                    d.sourceDocument != null &&
+                    d.targetDocument != null &&
+                    (d.fieldDiffs?.isNotEmpty ?? false),
+              )
+              .length,
+          'sourceOnlyCount': _diffResults
+              .where(
+                (d) => d.sourceDocument != null && d.targetDocument == null,
+              )
+              .length,
+          'targetOnlyCount': _diffResults
+              .where(
+                (d) => d.sourceDocument == null && d.targetDocument != null,
+              )
+              .length,
+          'diffResults': _diffResults,
+        };
+        onComparisonComplete!(result);
       }
     } catch (e) {
       ScaffoldMessenger.of(
