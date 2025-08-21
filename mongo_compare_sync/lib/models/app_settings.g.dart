@@ -12,6 +12,7 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) => AppSettings(
   locale: json['locale'] as String? ?? 'zh_CN',
   pageSize: (json['pageSize'] as num?)?.toInt() ?? 20,
   showObjectIds: json['showObjectIds'] as bool? ?? true,
+  maxDocuments: (json['maxDocuments'] as num?)?.toInt() ?? 2000,
   defaultRuleId: json['defaultRuleId'] as String?,
   caseSensitiveComparison: json['caseSensitiveComparison'] as bool? ?? true,
   defaultExportFormatIndex:
@@ -27,6 +28,7 @@ Map<String, dynamic> _$AppSettingsToJson(AppSettings instance) =>
       'locale': instance.locale,
       'pageSize': instance.pageSize,
       'showObjectIds': instance.showObjectIds,
+      'maxDocuments': instance.maxDocuments,
       'defaultRuleId': instance.defaultRuleId,
       'caseSensitiveComparison': instance.caseSensitiveComparison,
       'defaultExportFormatIndex': instance.defaultExportFormatIndex,

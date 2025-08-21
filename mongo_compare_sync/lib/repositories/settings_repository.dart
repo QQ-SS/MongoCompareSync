@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/app_settings.dart';
 
@@ -73,6 +74,12 @@ class SettingsRepository {
     await _writeSettingsToFile(settings); // 异步写入文件
   }
 
+  // 更新主题模式
+  Future<void> updateThemeMode(ThemeMode themeMode) async {
+    final settings = getSettings().copyWith(themeModeIndex: themeMode.index);
+    await saveSettings(settings);
+  }
+
   // 更新语言
   Future<void> updateLocale(String locale) async {
     final settings = getSettings().copyWith(locale: locale);
@@ -128,6 +135,12 @@ class SettingsRepository {
   // 更新是否启用日志记录
   Future<void> updateEnableLogging(bool enableLogging) async {
     final settings = getSettings().copyWith(enableLogging: enableLogging);
+    await saveSettings(settings);
+  }
+
+  // 更新最大加载文档数量
+  Future<void> updateMaxDocuments(int maxDocuments) async {
+    final settings = getSettings().copyWith(maxDocuments: maxDocuments);
     await saveSettings(settings);
   }
 }

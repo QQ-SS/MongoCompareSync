@@ -16,6 +16,7 @@ class AppSettings {
   // 数据显示设置
   final int pageSize;
   final bool showObjectIds;
+  final int maxDocuments;
 
   // 比较设置
   final String? defaultRuleId;
@@ -34,6 +35,7 @@ class AppSettings {
     this.locale = 'zh_CN',
     this.pageSize = 20,
     this.showObjectIds = true,
+    this.maxDocuments = 2000,
     this.defaultRuleId,
     this.caseSensitiveComparison = true,
     this.defaultExportFormatIndex = 0, // 0: json, 1: csv, 2: markdown
@@ -77,6 +79,7 @@ class AppSettings {
     String? locale,
     int? pageSize,
     bool? showObjectIds,
+    int? maxDocuments,
     String? defaultRuleId,
     bool? caseSensitiveComparison,
     int? defaultExportFormatIndex,
@@ -89,6 +92,7 @@ class AppSettings {
       locale: locale ?? this.locale,
       pageSize: pageSize ?? this.pageSize,
       showObjectIds: showObjectIds ?? this.showObjectIds,
+      maxDocuments: maxDocuments ?? this.maxDocuments,
       defaultRuleId: defaultRuleId ?? this.defaultRuleId,
       caseSensitiveComparison:
           caseSensitiveComparison ?? this.caseSensitiveComparison,

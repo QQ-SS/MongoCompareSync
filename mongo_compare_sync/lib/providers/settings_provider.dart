@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../repositories/settings_repository.dart';
 
 // 使用SharedPreferences来存储设置，而不是Hive
 // 这样可以避免与现有的Hive模型冲突
@@ -52,14 +53,15 @@ final defaultRuleIdProvider =
 
 // 主题模式状态管理
 class ThemeModeNotifier extends StateNotifier<ThemeMode> {
+  final SettingsRepository _repository = SettingsRepository();
+
   ThemeModeNotifier() : super(ThemeMode.system) {
     _loadSetting();
   }
 
   Future<void> _loadSetting() async {
-    final prefs = await SharedPreferences.getInstance();
-    final themeModeIndex = prefs.getInt('themeMode') ?? 0;
-    state = ThemeMode.values[themeModeIndex];
+    final settings = _repository.getSettings();
+    state = ThemeMode.values[settings.themeModeIndex];
   }
 
   @override
@@ -69,20 +71,21 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
   }
 
   Future<void> _saveSetting(ThemeMode value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('themeMode', value.index);
+    await _repository.updateThemeMode(value);
   }
 }
 
 // 每页显示文档数量状态管理
 class PageSizeNotifier extends StateNotifier<int> {
+  final SettingsRepository _repository = SettingsRepository();
+
   PageSizeNotifier() : super(20) {
     _loadSetting();
   }
 
   Future<void> _loadSetting() async {
-    final prefs = await SharedPreferences.getInstance();
-    state = prefs.getInt('pageSize') ?? 20;
+    final settings = _repository.getSettings();
+    state = settings.pageSize;
   }
 
   @override
@@ -92,20 +95,21 @@ class PageSizeNotifier extends StateNotifier<int> {
   }
 
   Future<void> _saveSetting(int value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('pageSize', value);
+    await _repository.updatePageSize(value);
   }
 }
 
 // 是否显示ObjectId状态管理
 class ShowObjectIdsNotifier extends StateNotifier<bool> {
+  final SettingsRepository _repository = SettingsRepository();
+
   ShowObjectIdsNotifier() : super(true) {
     _loadSetting();
   }
 
   Future<void> _loadSetting() async {
-    final prefs = await SharedPreferences.getInstance();
-    state = prefs.getBool('showObjectIds') ?? true;
+    final settings = _repository.getSettings();
+    state = settings.showObjectIds;
   }
 
   @override
@@ -115,20 +119,21 @@ class ShowObjectIdsNotifier extends StateNotifier<bool> {
   }
 
   Future<void> _saveSetting(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('showObjectIds', value);
+    await _repository.updateShowObjectIds(value);
   }
 }
 
 // 是否区分大小写比较状态管理
 class CaseSensitiveComparisonNotifier extends StateNotifier<bool> {
+  final SettingsRepository _repository = SettingsRepository();
+
   CaseSensitiveComparisonNotifier() : super(true) {
     _loadSetting();
   }
 
   Future<void> _loadSetting() async {
-    final prefs = await SharedPreferences.getInstance();
-    state = prefs.getBool('caseSensitiveComparison') ?? true;
+    final settings = _repository.getSettings();
+    state = settings.caseSensitiveComparison;
   }
 
   @override
@@ -138,20 +143,21 @@ class CaseSensitiveComparisonNotifier extends StateNotifier<bool> {
   }
 
   Future<void> _saveSetting(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('caseSensitiveComparison', value);
+    await _repository.updateCaseSensitiveComparison(value);
   }
 }
 
 // 是否在同步前确认状态管理
 class ConfirmBeforeSyncNotifier extends StateNotifier<bool> {
+  final SettingsRepository _repository = SettingsRepository();
+
   ConfirmBeforeSyncNotifier() : super(true) {
     _loadSetting();
   }
 
   Future<void> _loadSetting() async {
-    final prefs = await SharedPreferences.getInstance();
-    state = prefs.getBool('confirmBeforeSync') ?? true;
+    final settings = _repository.getSettings();
+    state = settings.confirmBeforeSync;
   }
 
   @override
@@ -161,20 +167,21 @@ class ConfirmBeforeSyncNotifier extends StateNotifier<bool> {
   }
 
   Future<void> _saveSetting(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('confirmBeforeSync', value);
+    await _repository.updateConfirmBeforeSync(value);
   }
 }
 
 // 是否启用日志记录状态管理
 class EnableLoggingNotifier extends StateNotifier<bool> {
+  final SettingsRepository _repository = SettingsRepository();
+
   EnableLoggingNotifier() : super(false) {
     _loadSetting();
   }
 
   Future<void> _loadSetting() async {
-    final prefs = await SharedPreferences.getInstance();
-    state = prefs.getBool('enableLogging') ?? false;
+    final settings = _repository.getSettings();
+    state = settings.enableLogging;
   }
 
   @override
@@ -184,20 +191,21 @@ class EnableLoggingNotifier extends StateNotifier<bool> {
   }
 
   Future<void> _saveSetting(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('enableLogging', value);
+    await _repository.updateEnableLogging(value);
   }
 }
 
 // 最大加载文档数量状态管理
 class MaxDocumentsNotifier extends StateNotifier<int> {
+  final SettingsRepository _repository = SettingsRepository();
+
   MaxDocumentsNotifier() : super(2000) {
     _loadSetting();
   }
 
   Future<void> _loadSetting() async {
-    final prefs = await SharedPreferences.getInstance();
-    state = prefs.getInt('maxDocuments') ?? 2000;
+    final settings = _repository.getSettings();
+    state = settings.maxDocuments;
   }
 
   @override
@@ -207,20 +215,21 @@ class MaxDocumentsNotifier extends StateNotifier<int> {
   }
 
   Future<void> _saveSetting(int value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('maxDocuments', value);
+    await _repository.updateMaxDocuments(value);
   }
 }
 
 // 默认规则ID状态管理
 class DefaultRuleIdNotifier extends StateNotifier<String?> {
+  final SettingsRepository _repository = SettingsRepository();
+
   DefaultRuleIdNotifier() : super(null) {
     _loadSetting();
   }
 
   Future<void> _loadSetting() async {
-    final prefs = await SharedPreferences.getInstance();
-    state = prefs.getString('defaultRuleId');
+    final settings = _repository.getSettings();
+    state = settings.defaultRuleId;
   }
 
   @override
@@ -230,11 +239,6 @@ class DefaultRuleIdNotifier extends StateNotifier<String?> {
   }
 
   Future<void> _saveSetting(String? value) async {
-    final prefs = await SharedPreferences.getInstance();
-    if (value != null) {
-      await prefs.setString('defaultRuleId', value);
-    } else {
-      await prefs.remove('defaultRuleId');
-    }
+    await _repository.updateDefaultRuleId(value);
   }
 }
