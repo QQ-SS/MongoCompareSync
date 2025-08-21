@@ -13,7 +13,6 @@ class SettingsScreen extends ConsumerWidget {
     final maxDocuments = ref.watch(maxDocumentsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('应用设置')),
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [

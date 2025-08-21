@@ -61,10 +61,7 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
           );
         }
 
-        return Scaffold(
-          appBar: AppBar(title: const Text('集合比较')),
-          body: _buildDragDropCompareView(allConnections),
-        );
+        return Scaffold(body: _buildDragDropCompareView(allConnections));
       },
       loading: () => Scaffold(
         body: Center(

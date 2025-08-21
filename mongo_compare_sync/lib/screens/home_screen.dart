@@ -22,6 +22,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     const SettingsScreen(),
   ];
 
+  // 页面标题
+  final List<String> _pageTitles = ['连接管理', '比较同步', '设置'];
+
   // 底部导航栏项目
   final List<BottomNavigationBarItem> _navItems = [
     const BottomNavigationBarItem(icon: Icon(Icons.storage), label: '连接管理'),
@@ -69,7 +72,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       // 小屏幕布局 - 使用底部导航栏
       small: Scaffold(
         appBar: AppBar(
-          title: const Text('MongoDB比较同步工具'),
+          title: Text(_pageTitles[_selectedIndex]),
           centerTitle: true,
           elevation: 0,
           backgroundColor: Theme.of(context).colorScheme.primary,
@@ -101,7 +104,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             Expanded(
               child: Scaffold(
                 appBar: AppBar(
-                  title: const Text('MongoDB比较同步工具'),
+                  title: Text(_pageTitles[_selectedIndex]),
                   centerTitle: true,
                   elevation: 0,
                   backgroundColor: Theme.of(context).colorScheme.primary,
