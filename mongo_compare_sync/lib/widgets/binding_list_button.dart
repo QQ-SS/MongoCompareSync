@@ -4,11 +4,13 @@ import '../models/comparison_task.dart';
 import '../models/connection.dart';
 import '../models/document.dart';
 import '../providers/connection_provider.dart';
+import '../providers/compare_view_provider.dart';
 import '../repositories/comparison_task_repository.dart';
 import '../screens/document_tree_comparison_screen.dart';
 import '../services/mongo_service.dart';
 
 class BindingListButton extends ConsumerStatefulWidget {
+  final String? taskName;
   final List<BindingConfig> bindings;
   final MongoConnection? sourceConnection;
   final MongoConnection? targetConnection;
@@ -20,6 +22,7 @@ class BindingListButton extends ConsumerStatefulWidget {
 
   const BindingListButton({
     super.key,
+    required this.taskName,
     required this.bindings,
     required this.sourceConnection,
     required this.targetConnection,
@@ -40,6 +43,12 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
   final ComparisonTaskRepository _taskRepository = ComparisonTaskRepository();
   List<ComparisonTask>? _savedTasks;
   String? _currentTaskName; // 添加当前任务名变量
+
+  @override
+  void initState() {
+    super.initState();
+    _currentTaskName = widget.taskName;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -492,8 +501,14 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
       _currentTaskName = task.name;
     });
 
-    // 清空当前绑定列表
-    widget.onClearAllBindings();
+    // 导入到Provider中
+    final compareViewNotifier = ref.read(compareViewProvider.notifier);
+    compareViewNotifier.loadTaskState(
+      taskName: task.name,
+      bindings: task.bindings,
+      sourceConnectionId: task.sourceConnectionId,
+      targetConnectionId: task.targetConnectionId,
+    );
 
     // 更改连接（如果提供了回调）
     if (widget.onConnectionChange != null) {
@@ -501,24 +516,6 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
         task.sourceConnectionId,
         task.targetConnectionId,
       );
-    }
-
-    // 将任务中的所有绑定添加到绑定列表
-    for (final bindingConfig in task.bindings) {
-      final binding = BindingConfig(
-        id: '${bindingConfig.sourceDatabaseName}_${bindingConfig.sourceCollection}_${bindingConfig.targetDatabaseName}_${bindingConfig.targetCollection}',
-        sourceCollection: bindingConfig.sourceCollection,
-        targetCollection: bindingConfig.targetCollection,
-        sourceDatabaseName: bindingConfig.sourceDatabaseName,
-        targetDatabaseName: bindingConfig.targetDatabaseName,
-        idField: bindingConfig.idField,
-        ignoredFields: bindingConfig.ignoredFields,
-      );
-
-      // 如果提供了添加绑定的回调，使用它来添加绑定
-      if (widget.onAddBinding != null) {
-        widget.onAddBinding!(binding);
-      }
     }
 
     // 显示成功消息

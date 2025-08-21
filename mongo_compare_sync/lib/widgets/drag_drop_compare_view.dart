@@ -22,6 +22,7 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
   final GlobalKey _painterKey = GlobalKey();
 
   // 使用 provider 中的状态
+  String? get _taskName => ref.watch(compareViewProvider).taskName;
   List<BindingConfig> get _bindings => ref.watch(compareViewProvider).bindings;
   MongoConnection? get _sourceConnection =>
       ref.watch(compareViewProvider).sourceConnection;
@@ -163,6 +164,7 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                         // 使用独立的绑定列表按钮组件
                         Positioned.fill(
                           child: BindingListButton(
+                            taskName: _taskName,
                             bindings: _bindings,
                             sourceConnection: _sourceConnection,
                             targetConnection: _targetConnection,

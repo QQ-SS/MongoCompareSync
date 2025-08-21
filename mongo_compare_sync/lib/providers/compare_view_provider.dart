@@ -4,17 +4,20 @@ import '../models/comparison_task.dart';
 
 // 存储比较视图的状态
 class CompareViewState {
+  final String taskName;
   final List<BindingConfig> bindings;
   final MongoConnection? sourceConnection;
   final MongoConnection? targetConnection;
 
   CompareViewState({
+    required this.taskName,
     required this.bindings,
-    this.sourceConnection,
-    this.targetConnection,
+    required this.sourceConnection,
+    required this.targetConnection,
   });
 
   CompareViewState copyWith({
+    String? taskName,
     List<BindingConfig>? bindings,
     MongoConnection? sourceConnection,
     MongoConnection? targetConnection,
@@ -22,6 +25,7 @@ class CompareViewState {
     bool clearTargetConnection = false,
   }) {
     return CompareViewState(
+      taskName: taskName ?? this.taskName,
       bindings: bindings ?? this.bindings,
       sourceConnection: clearSourceConnection
           ? null
@@ -37,11 +41,33 @@ class CompareViewNotifier extends StateNotifier<CompareViewState> {
   CompareViewNotifier()
     : super(
         CompareViewState(
+          taskName: "",
           bindings: [],
           sourceConnection: null,
           targetConnection: null,
         ),
       );
+
+  void setTaskName(String? taskName) {
+    state = state.copyWith(taskName: taskName);
+  }
+
+  // 加载完整任务状态
+  void loadTaskState({
+    required String taskName,
+    required List<BindingConfig> bindings,
+    String? sourceConnectionId,
+    String? targetConnectionId,
+  }) {
+    // 设置任务名称
+    setTaskName(taskName);
+
+    // 清空现有绑定并添加新绑定
+    state = state.copyWith(bindings: []);
+    for (final binding in bindings) {
+      addBinding(binding);
+    }
+  }
 
   // 设置源连接
   void setSourceConnection(MongoConnection? connection) {
