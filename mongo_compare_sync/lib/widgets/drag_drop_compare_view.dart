@@ -136,6 +136,7 @@ class _DragDropCompareViewState extends ConsumerState<DragDropCompareView>
                                   type: PanelType.target,
                                   onDragAccept: _createBinding,
                                   onBindingCheck: _isTargetBound,
+                                  onCollectionsLoaded: _repaintConnectionLines,
                                 ),
                               ),
                             ],
