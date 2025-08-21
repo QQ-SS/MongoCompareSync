@@ -345,6 +345,9 @@ class _BindingListButtonState extends ConsumerState<BindingListButton> {
     // 保存任务
     await _taskRepository.saveTask(task);
 
+    // 更新全局状态中的任务名称
+    ref.read(compareViewProvider.notifier).setTaskName(name);
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('任务 "$name" 已保存，包含 ${bindingConfigs.length} 个绑定')),
     );
