@@ -24,6 +24,7 @@ class _ConnectionFormState extends ConsumerState<ConnectionForm> {
   bool _isAuthEnabled = false;
   bool _isTesting = false;
   String? _testResult;
+  bool _controllersInitialized = false;
 
   @override
   void initState() {
@@ -36,43 +37,56 @@ class _ConnectionFormState extends ConsumerState<ConnectionForm> {
     super.didUpdateWidget(oldWidget);
     // 当 widget.initialConnection 发生变化时，更新表单内容
     if (oldWidget.initialConnection?.id != widget.initialConnection?.id) {
-      _initControllers();
+      _updateControllers();
     }
   }
 
   void _initControllers() {
     final connection = widget.initialConnection;
     
-    // 如果控制器已经存在，则更新其值
-    if (_nameController != null) {
-      _nameController.text = connection?.name ?? '';
-      _hostController.text = connection?.host ?? 'localhost';
-      _portController.text = connection?.port.toString() ?? '27017';
-      _usernameController.text = connection?.username ?? '';
-      _passwordController.text = connection?.password ?? '';
-      _databaseController.text = connection?.authSource ?? '';
-    } else {
-      // 首次初始化控制器
-      _nameController = TextEditingController(text: connection?.name ?? '');
-      _hostController = TextEditingController(
-        text: connection?.host ?? 'localhost',
-      );
-      _portController = TextEditingController(
-        text: connection?.port.toString() ?? '27017',
-      );
-      _usernameController = TextEditingController(
-        text: connection?.username ?? '',
-      );
-      _passwordController = TextEditingController(
-        text: connection?.password ?? '',
-      );
-      _databaseController = TextEditingController(
-        text: connection?.authSource ?? '',
-      );
-    }
+    // 首次初始化控制器
+    _nameController = TextEditingController(text: connection?.name ?? '');
+    _hostController = TextEditingController(
+      text: connection?.host ?? 'localhost',
+    );
+    _portController = TextEditingController(
+      text: connection?.port.toString() ?? '27017',
+    );
+    _usernameController = TextEditingController(
+      text: connection?.username ?? '',
+    );
+    _passwordController = TextEditingController(
+      text: connection?.password ?? '',
+    );
+    _databaseController = TextEditingController(
+      text: connection?.authSource ?? '',
+    );
     
     _isAuthEnabled = connection?.username?.isNotEmpty ?? false;
     _testResult = null;
+    _controllersInitialized = true;
+  }
+  
+  void _updateControllers() {
+    if (!_controllersInitialized) {
+      _initControllers();
+      return;
+    }
+    
+    final connection = widget.initialConnection;
+    
+    // 更新控制器的值
+    _nameController.text = connection?.name ?? '';
+    _hostController.text = connection?.host ?? 'localhost';
+    _portController.text = connection?.port.toString() ?? '27017';
+    _usernameController.text = connection?.username ?? '';
+    _passwordController.text = connection?.password ?? '';
+    _databaseController.text = connection?.authSource ?? '';
+    
+    setState(() {
+      _isAuthEnabled = connection?.username?.isNotEmpty ?? false;
+      _testResult = null;
+    });
   }
 
   @override
